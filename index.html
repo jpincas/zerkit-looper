@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MIDI Looper</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="transport">
+      <div class="group">
+        <button id="play" class="btn" title="Play / Stop (Space)"><span class="icon">▶</span><kbd>Space</kbd></button>
+        <button id="rec" class="btn rec" title="Record (X)"><span class="dot"></span>Rec<kbd>X</kbd></button>
+        <button id="undo" class="btn" title="Undo last recording (Z)">Undo<kbd>Z</kbd></button>
+        <button id="clear" class="btn" title="Clear selected track (Backspace) · Shift: clear all">Clear<kbd>⌫</kbd></button>
+      </div>
+
+      <div class="group">
+        <button id="tempo-down" class="btn square" title="Tempo down (↓, Shift for 5)">−</button>
+        <div class="readout"><span id="bpm">120</span><small>BPM ↑↓</small></div>
+        <button id="tempo-up" class="btn square" title="Tempo up (↑, Shift for 5)">+</button>
+        <button id="click" class="btn toggle" title="Metronome (C)">Click<kbd>C</kbd></button>
+      </div>
+
+      <div class="group grow">
+        <div class="readout"><span id="pos">1.1</span><small>BAR.BEAT</small></div>
+        <div class="beats" id="beats"><i></i><i></i><i></i><i></i></div>
+        <div id="status" class="status">Stopped</div>
+      </div>
+    </header>
+
+    <section class="tracks" id="tracks"></section>
+
+    <section class="keys-area">
+      <div class="kb-side">
+        <div id="kb-track" class="kb-track">Track 1 · Synth</div>
+        <div class="group">
+          <button id="oct-down" class="btn square" title="Octave down (,)">−</button>
+          <div class="readout"><span id="oct">C4</span><small>OCTAVE , .</small></div>
+          <button id="oct-up" class="btn square" title="Octave up (.)">+</button>
+        </div>
+      </div>
+      <div class="keyboard" id="keyboard"></div>
+    </section>
+  </main>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
