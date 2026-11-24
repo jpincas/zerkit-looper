@@ -1,3 +1,8 @@
 .DS_Store
 node_modules/
 .claude/settings.local.json
+.midi-log.jsonl
+circuit/incoming/
+.venv/
+circuit/build/
+__pycache__/
