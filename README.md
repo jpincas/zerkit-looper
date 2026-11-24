@@ -68,10 +68,38 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 |
 | Preset (Shift reverses) | Change the selected track's instrument |
 | Octave ▼ ▲ | Keyboard octave |
-| Tempo/Swing | Click on/off |
-| Macro knob 1 | Tempo |
-| Bottom two pad rows | Keyboard with velocity (drum pads on drum tracks) |
-| Top two pad rows | Loop position (16-step playhead) |
+| Tempo/Swing: tap / hold + turn macro knob 1 | Click on/off / tempo |
+| Macro knob above each track | That track's volume |
+| Note | Switch between track view and Note mode |
+| Hold 1-16/17-32 + track button | Cycle that track's record quantise (lights show it while held: red off, amber 32nds, green 16ths) |
+
+**Track view** (default):
+
+| Pads | Looper |
+| --- | --- |
+| Row 1 | Mute each track (red = muted) |
+| Row 2 | Solo each track (green = soloed; several can be soloed) |
+| Rows 3–4 | 16-step view of the selected track: the bar the playhead is in, notes in the track colour |
+
+**Note mode:** all 32 pads are a two-octave keyboard with velocity. Rows 1–2 are the upper octave
+and rows 3–4 the lower; in each pair, black keys are above white keys. Track buttons still
+select tracks.
+
+**Record quantise** is per track and starts off. Off keeps notes where you played them;
+otherwise their starts snap to 32nds or 16ths. Notes keep the length you played, and you hear
+them live exactly as played; the loop plays them on the grid from the next pass.
+
+On screen, each track button has a quantise chip (Q red = off, 32 amber, 16 green; click to change), M and S toggles, and a volume bar along its bottom edge
+(scroll over the button to change it).
+
+## Audio tracks
+
+Choose **Audio** as a track's instrument, then pick any of the computer's audio inputs (an
+instrument's USB audio, an interface, a mic). Arm with X: the take starts on the first sound
+and closes on a bar line like any other, and plays back through the computer's audio output
+with its own loop length, mute, solo, volume and undo. Recordings are shifted back by the
+input's latency so they sit on the beat. Once a track holds audio the tempo is locked.
+Overdubbing on audio tracks isn't there yet.
 
 ## Code layout
 
@@ -81,4 +109,5 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 - `src/instruments.js`: the synth voice and the drum rack.
 - `src/roll.js`: canvas piano roll (one per track).
 - `src/keys.js`: computer-keyboard note mapping.
+- `src/audioin.js`, `src/capture-worklet.js`: audio inputs, captured continuously so takes can be cut out of them.
 - `src/main.js`: wiring, shortcuts and the render loop.

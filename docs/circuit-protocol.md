@@ -1,4 +1,4 @@
-# Circuit Tracks control-surface protocol (LOOP04 firmware)
+# Circuit Tracks control-surface protocol (LOOP04 / LOOP05 firmware)
 
 The patched firmware turns the Novation Circuit Tracks into a dedicated USB controller for the
 looper. The Circuit's own sequencer, sounds and screens are switched off. Every input goes to the
@@ -38,6 +38,7 @@ Drum 1, Mixer and FX):
 | --- | --- |
 | Set one light | `F0 7D 01 <led> <colour> F7` |
 | Set a run of lights | `F0 7D 02 <first led> <colour> <colour> … F7` (stops at LED 68; a whole panel is 74 bytes) |
+| Knob brightness (LOOP05) | `F0 7D 03 <first led> <brightness> … F7`, for LEDs 60–68 only (others skipped). 127 = full colour; 0–126 scale it from 10% to 98% |
 
 LED numbers: pads 0–31 (same numbering as pad presses), buttons `32 + id`, macro knobs 60–67,
 master filter 68. Some button LEDs are single-colour (white), so any non-zero code just lights them.
@@ -47,11 +48,15 @@ Colours are Novation palette codes 0–127, for example 0 off, 0x01 white, 0x09 
 Some codes are animated (flash or pulse) by the firmware. Use Palette mode in `lights.html` to
 see every code on the device.
 
+Knob brightness uses the stock firmware's own scaler (0x080475a6), which it normally uses
+to show parameter values on the knobs. Brightness starts at 127 (full) for every knob. LOOP04
+ignores command 03.
+
 All lights are off at power-on. The firmware keeps the last frame the app sent.
 
 ## Building, flashing and recovery
 
-- `circuit/build_lights.py` builds LOOP04 from Novation's official 1.2.1 file, which `circuit/fw.py`
+- `circuit/build_lights.py` builds LOOP04 (or LOOP05 with `--bright`) from Novation's official 1.2.1 file, which `circuit/fw.py`
   checks by SHA-256. `circuit/test_*.py` run the patched code in an ARM emulator.
 - `flash.html` sends allow-listed builds to the Circuit in recovery mode. Recovery mode is
   **Scales + Preset + Note** held at power-on, and it also restores the official firmware.

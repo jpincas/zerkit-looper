@@ -131,6 +131,8 @@ export const INSTRUMENTS = {
     name: 'Drums', color: '#4cc9b0', drums: true,
     voice: (...args) => drumVoice(...args),
   },
+  // Audio: records an audio input (chosen per track) instead of playing notes.
+  audio: { name: 'Audio', color: '#c9d46a', audio: true },
 };
 
 // ---- drum rack ------------------------------------------------------------

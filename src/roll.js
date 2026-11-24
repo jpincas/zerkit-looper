@@ -96,6 +96,23 @@ export function drawRoll(canvas, view, beatsPerBar, rows, color) {
   }
   ctx.globalAlpha = 1;
 
+  // Audio clips: a waveform across the whole lane, one per pass of the loop.
+  const mid = RULER + (h - RULER) / 2, amp = (h - RULER) / 2 - 6;
+  for (const c of view.clips ?? []) {
+    const x0 = x(c.start), x1 = x(c.start + c.len), n = Math.max(1, Math.round(x1 - x0));
+    const peaks = c.clip.peaks(n);
+    ctx.globalAlpha = c.ghost ? 0.38 : 1;
+    ctx.fillStyle = color;
+    if (!peaks) { ctx.fillRect(Math.max(GUTTER, x0), mid - 0.5, Math.min(x1, w) - Math.max(GUTTER, x0), 1); continue; }
+    for (let i = 0; i < n; i++) {
+      const px = x0 + i;
+      if (px < GUTTER || px >= w) continue;
+      const a = Math.max(0.5, Math.min(1, Math.sqrt(peaks[i])) * amp);   // sqrt: quiet parts stay visible
+      ctx.fillRect(px, mid - a, 1, a * 2);
+    }
+  }
+  ctx.globalAlpha = 1;
+
   // Playhead
   const hx = Math.round(x(view.head)) + 0.5;
   ctx.strokeStyle = view.recording ? C.headRec : C.head;

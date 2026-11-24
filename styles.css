@@ -84,6 +84,8 @@ body {
 .rec[data-state="overdub"] .dot { background: var(--accent); }
 @keyframes blink { 50% { opacity: 0.15; } }
 
+.level { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.level input { width: 90px; accent-color: var(--accent); }
 .readout { display: flex; flex-direction: column; align-items: center; min-width: 56px; }
 .readout span { font: 600 20px ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
 .readout small { font-size: 9px; letter-spacing: 0.08em; color: var(--muted); }
@@ -251,6 +253,21 @@ body[data-inst="pitched"] .key.black .name { display: none; }
 .tbtn.empty .tname { color: var(--muted); }
 .tbtn.selected { background: color-mix(in srgb, var(--c) 18%, var(--panel)); border-color: var(--c); }
 .tbtn.rec { outline: 2px solid var(--rec); outline-offset: -2px; }
+.tbtn.silent .tnum, .tbtn.silent .tname { opacity: 0.4; }
+.tbtn .tms { position: absolute; right: 6px; bottom: 9px; display: flex; gap: 3px; }
+.tbtn .tms b {
+  width: 17px; height: 17px; border-radius: 4px; display: grid; place-items: center;
+  font: 600 10px ui-monospace, Menlo, monospace; color: var(--muted); background: var(--panel-2);
+}
+.tbtn .tms b:hover { color: var(--text); }
+.tbtn .tm.on { background: var(--rec); color: #1a0606; }
+.tbtn .ts.on { background: #4fd16b; color: #06180b; }
+.tbtn .tq { width: auto !important; min-width: 17px; padding: 0 3px; }
+.tbtn .tq[data-q="off"] { color: var(--rec); }
+.tbtn .tq[data-q="mid"] { color: var(--accent); }
+.tbtn .tq[data-q="strong"] { color: #4fd16b; }
+.tbtn .tvol { position: absolute; left: 10px; right: 10px; bottom: 3px; height: 2px; background: #2a2f39; border-radius: 1px; }
+.tbtn .tvol i { display: block; height: 100%; background: var(--c); border-radius: 1px; }
 
 /* ---- the selected track's sequencer ---- */
 

@@ -1,6 +1,9 @@
 """Build LOOP04: LOOP3D (full input takeover) + the app controls every light.
 
-    .venv/bin/python build_lights.py incoming/circuittracks-firmware-4486.syx
+    .venv/bin/python build_lights.py incoming/circuittracks-firmware-4486.syx [--bright]
+
+--bright builds LOOP05: LOOP04 plus `F0 7D 03 <led> <brightness 0-127> ... F7` for the knob
+LEDs 60-68 (127 = full; 0-126 scale the colour from 10% to 98%).
 
 Lights: the panel's 69 LEDs (0-31 pads, 32 + button id for buttons, 60-67 knobs, 68 master
 filter) are shown from our own 69-code frame in RAM; the stock painter never runs. Colours
@@ -37,13 +40,27 @@ FRAME = RAM_SIG + 4
 N_LEDS = 69
 MARK = b'LOOP04'
 
+# LOOP05 = LOOP04 + knob brightness. The stock LED converter 0x0803423c turns the frame's codes
+# into RGB; for the knob LEDs (60-68) it can scale a colour by a brightness 0-126 through
+# 0x080475a6 (factor = b * 0x1cc + 0x1a00, /65536: 10%..98%), and uses 0xff for "don't scale".
+# We replace its `movs r4, #0xff ; ldr r0, [pc, #0x174]` with `bl c_knob`.
+MARK5 = b'LOOP05'
+SIG5 = 0x354F4F50                             # 'POO5': a fresh signature, so LOOP04's RAM is re-initialised
+KNOB_SITE, KNOB_ORIG = 0x080342B2, bytes.fromhex('ff245d48')
+PALETTE_LIT, PALETTE_PTR = 0x0803442C, 0x20003804
+
 
 def mov32(a, rd, value, comment=''):
     a(f'movw r{rd}, #{value & 0xFFFF:#x}', T.mov32(rd, value)[:4])
     a(f'movt r{rd}, #{value >> 16:#x}', T.mov32(rd, value)[4:])
 
 
-def lights_code(base):
+# Knob brightness (LOOP05 only): 9 bytes, one per LED 60-68, after the frame.
+BRIGHT = RAM_SIG + 0x90
+FULL = 127                                    # 127 = full colour; 0-126 = 10%-98% (stock scaler)
+
+
+def lights_code(base, sig=SIG, bright=False):
     a = T.Asm(base)
     br = lambda cond, lbl: (lambda at, L: T.b_cond(at, L[lbl], cond))
     bl_ = lambda lbl: (lambda at, L: T.bl(at, L[lbl]))
@@ -52,7 +69,7 @@ def lights_code(base):
     a.label('c_init')
     mov32(a, 3, RAM_SIG)
     a('ldr r2, [r3]', T.ldr(2, 3))
-    mov32(a, 1, SIG)
+    mov32(a, 1, sig)
     a('cmp r2, r1', T.cmp_r(2, 1))
     a('beq <init_done>', br('eq', 'init_done'), 2)
     a('str r1, [r3]', T.str_(1, 3))
@@ -63,6 +80,11 @@ def lights_code(base):
     a('str r2, [r3]', T.str_(2, 3))
     a('subs r0, #1', T.subs(0, 1))
     a('bne <init_loop>', br('ne', 'init_loop'), 2)
+    if bright:                                             # r3 = RAM_SIG + 0x8C: three words of FULL
+        mov32(a, 2, FULL * 0x01010101)
+        for _ in range(3):
+            a('adds r3, #4', T.adds(3, 4))
+            a('str r2, [r3]', T.str_(2, 3))
     a.label('init_done')
     a('bx lr', T.bx_lr())
 
@@ -100,6 +122,9 @@ def lights_code(base):
     a('beq <sx_one>', br('eq', 'sx_one'), 2)
     a('cmp r0, #2', T.cmp(0, 2))
     a('beq <sx_run>', br('eq', 'sx_run'), 2)
+    if bright:
+        a('cmp r0, #3', T.cmp(0, 3))
+        a('beq <sx_bri>', br('eq', 'sx_bri'), 2)
     a('b <sx_done>', lambda at, L: T.b(at, L['sx_done']), 2)
     # F0 7D 01 led colour F7
     a.label('sx_one')
@@ -128,18 +153,55 @@ def lights_code(base):
     a('adds r0, #1', T.adds(0, 1))
     a('subs r5, #1', T.subs(5, 1))
     a('bne <run_loop>', br('ne', 'run_loop'), 2)
+    if bright:
+        # F0 7D 03 first b0 b1 ... F7: brightness for LEDs 60-68 (others skipped)
+        a.label('sx_bri')
+        a('ldrb r0, [r4, #3]', T.ldrb(0, 4, 3))
+        a('subs r5, #5', T.subs(5, 5))
+        a('ble <sx_done>', br('le', 'sx_done'), 2)
+        a('adds r4, #4', T.adds(4, 4))
+        mov32(a, 6, BRIGHT - 60)
+        a.label('bri_loop')
+        a(f'cmp r0, #{N_LEDS}', T.cmp(0, N_LEDS))
+        a('bhs <sx_done>', br('hs', 'sx_done'), 2)
+        a('cmp r0, #60', T.cmp(0, 60))
+        a('blo <bri_next>', br('lo', 'bri_next'), 2)
+        a('ldrb r1, [r4]', T.ldrb(1, 4))
+        a('strb r1, [r6, r0]', T.strb_r(1, 6, 0))
+        a.label('bri_next')
+        a('adds r4, #1', T.adds(4, 1))
+        a('adds r0, #1', T.adds(0, 1))
+        a('subs r5, #1', T.subs(5, 1))
+        a('bne <bri_loop>', br('ne', 'bri_loop'), 2)
     a.label('sx_done')
     a('pop {r4, r5, r6, pc}', T.pop([4, 5, 6], pc=True))
+    if bright:
+        # c_knob: called from the stock converter's knob loop in place of
+        # `movs r4, #0xff ; ldr r0, [pc, #0x174]`. r8 = knob LEDs left (9 -> LED 60), so this
+        # LED is BRIGHT[9 - r8]. Returns r4 = brightness for the stock scaler (0xff = full,
+        # untouched) and r0 = the palette pointer the displaced ldr loaded. Clobbers r1.
+        a.label('c_knob')
+        a('movs r4, #0xff', T.movs(4, 0xFF))
+        mov32(a, 0, BRIGHT + 9)
+        a('mov r1, r8', T.mov(1, 8))
+        a('subs r0, r0, r1', T.subs_r(0, 0, 1))
+        a('ldrb r0, [r0]', T.ldrb(0, 0))
+        a(f'cmp r0, #{FULL}', T.cmp(0, FULL))
+        a('bhs <knob_full>', br('hs', 'knob_full'), 2)
+        a('mov r4, r0', T.mov(4, 0))
+        a.label('knob_full')
+        mov32(a, 0, PALETTE_PTR)
+        a('bx lr', T.bx_lr())
     code, listing = a.assemble()
     return code, listing, a.labels
 
 
-def build(stock):
+def build(stock, bright=False):
     img, *_ = BT.build(stock, diag=True)                     # LOOP3D inputs, unchanged
     img = bytearray(img)
     base = fw.APP_BASE + ((len(img) + 3) & ~3)
     img += b'\xFF' * (base - fw.APP_BASE - len(img))
-    code, listing, labels = lights_code(base)
+    code, listing, labels = lights_code(base, SIG5 if bright else SIG, bright)
     img += code
     for site in LED_CALLS:
         off = site - fw.APP_BASE
@@ -148,7 +210,13 @@ def build(stock):
     off = SX_IN - fw.APP_BASE
     assert bytes(img[off:off + 4]) == SX_PROLOGUE
     img[off:off + 4] = T.b_w(SX_IN, labels['c_sx'])
-    img[fw.VERSION_MARK:fw.VERSION_MARK + 6] = MARK
+    if bright:
+        off = KNOB_SITE - fw.APP_BASE
+        assert bytes(img[off:off + 4]) == KNOB_ORIG, 'knob site: not movs r4, #0xff ; ldr r0, [pc, #0x174]'
+        lit = PALETTE_LIT - fw.APP_BASE
+        assert int.from_bytes(img[lit:lit + 4], 'little') == PALETTE_PTR
+        img[off:off + 4] = T.bl(KNOB_SITE, labels['c_knob'])
+    img[fw.VERSION_MARK:fw.VERSION_MARK + 6] = MARK5 if bright else MARK
     return bytes(img), base, listing, labels
 
 
@@ -166,12 +234,16 @@ def verify(img, base, listing, labels):
         assert ins.mnemonic == 'bl' and int(ins.op_str.lstrip('#'), 16) == labels['c_leds']
     ins = next(md.disasm(img[SX_IN - fw.APP_BASE:SX_IN - fw.APP_BASE + 4], SX_IN))
     assert ins.mnemonic == 'b.w' and int(ins.op_str.lstrip('#'), 16) == labels['c_sx']
+    if 'c_knob' in labels:
+        ins = next(md.disasm(img[KNOB_SITE - fw.APP_BASE:KNOB_SITE - fw.APP_BASE + 4], KNOB_SITE))
+        assert ins.mnemonic == 'bl' and int(ins.op_str.lstrip('#'), 16) == labels['c_knob']
     return got
 
 
 if __name__ == '__main__':
     stock = fw.load_stock(sys.argv[1])
-    img, base, listing, labels = build(stock)
+    bright = '--bright' in sys.argv                          # LOOP05
+    img, base, listing, labels = build(stock, bright)
     for a, text in verify(img, base, listing, labels):
         print(f'  {a:#010x}  {text}')
     print('labels:', {k: hex(v) for k, v in labels.items() if k.startswith('c_')})
@@ -179,7 +251,7 @@ if __name__ == '__main__':
     sent = fw.decode(syx)
     assert sent[:len(img)] == img and set(sent[len(img):]) <= {0xFF}
     os.makedirs('build', exist_ok=True)
-    out = 'build/circuittracks-4486-LOOP04.syx'
+    out = f'build/circuittracks-4486-{(MARK5 if bright else MARK).decode()}.syx'
     open(out, 'wb').write(syx)
     open(out.replace('.syx', '.bin'), 'wb').write(sent)
     print(f'image {len(img):#x} (sent as {len(sent):#x}); wrote {out}  sha256 {fw.sha256(syx)}')

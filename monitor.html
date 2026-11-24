@@ -19,6 +19,10 @@
     #log { font: 12px/1.5 ui-monospace, Menlo, monospace; height: 55vh; overflow: auto; white-space: pre; }
     #log .clock { color: var(--muted); }
     #log .new { color: var(--accent); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+    .now { font: 600 22px ui-monospace, Menlo, monospace; color: var(--accent); }
+    button.primary { border-color: #4f7a49; background: #2a3b28; }
+    select { background: #1c2029; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; }
     button { background: #1c2029; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
   </style>
 </head>
@@ -32,6 +36,20 @@
   <div class="panel">
     <strong>Devices</strong>
     <div id="devices" class="muted">None yet</div>
+  </div>
+  <div class="panel">
+    <strong>Send test notes</strong>
+    <div class="row">
+      <label>To <select id="outSel"></select></label>
+      <button id="identify">Identify</button>
+      <button id="panic">All notes off</button>
+      <span id="idres" class="muted"></span>
+    </div>
+    <div class="row">
+      <button id="sweep" class="primary">Play a chord on channels 1–16 in turn</button>
+      <span id="now" class="now"></span>
+    </div>
+    <div class="row" id="chans"></div>
   </div>
   <div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center">
@@ -59,10 +77,11 @@ const BUTTONS = ['Synth 1', 'Synth 2', 'MIDI 1', 'MIDI 2', 'Drum 1', 'Drum 2', '
 const NOTE = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const noteName = n => NOTE[n % 12] + (Math.floor(n / 12) - 1);
 
-function decode(d) {
+function decode(d, port = '') {
   const [s, a, b] = d;
   const ch = (s & 0x0f) + 1;
-  if (ch === 15) {   // patched firmware LOOP02: our control-surface messages
+  const circuit = /circuit/i.test(port);
+  if (circuit && ch === 15) {   // patched firmware LOOP02: our control-surface messages
     if ((s & 0xf0) === 0x90) return `PAD ${a} pressed, velocity ${b}`;
     if ((s & 0xf0) === 0x80) return `PAD ${a} released`;
     if ((s & 0xf0) === 0xb0 && a === 100) return `   gate ${b.toString(2).padStart(7, '0')}  (MIDI ${b & 4 ? 'OFF' : 'on'}, lock ${b & 1})`;
@@ -76,7 +95,7 @@ function decode(d) {
     case 0x90: return b ? `ch${ch} note-on  ${a} (${noteName(a)}) vel ${b}` : `ch${ch} note-off ${a} (${noteName(a)})`;
     case 0xa0: return `ch${ch} poly-aftertouch ${a} = ${b}`;
     case 0xb0:
-      if (ch === 15 && a >= 20 && a < 20 + BUTTONS.length) return `BUTTON ${BUTTONS[a - 20]} ${b ? 'pressed' : 'released'}  (ch15 CC ${a} = ${b})`;
+      if (circuit && ch === 15 && a >= 20 && a < 20 + BUTTONS.length) return `BUTTON ${BUTTONS[a - 20]} ${b ? 'pressed' : 'released'}  (ch15 CC ${a} = ${b})`;
       return `ch${ch} CC ${a} = ${b}`;
     case 0xc0: return `ch${ch} program ${a}`;
     case 0xd0: return `ch${ch} channel-pressure ${a}`;
@@ -109,7 +128,8 @@ function showDevices(access) {
       const d = e.data;
       if (d[0] === 0xf8) { clocks++; return; } // clock floods at 24 per beat: count it instead
       if (d[0] === 0xfe) return;
-      const text = decode(d);
+      const text = d[0] === 0xf0 ? 'sysex ' + hex(d) : decode(d, input.name);
+      if (d[0] === 0xf0 && d[1] === 0x7e && d[3] === 0x06 && d[4] === 0x02) $('idres').textContent = `${input.name}: ${hex(d)}`;
       line(`${input.name.padEnd(22)} ${hex(d).padEnd(9)} ${text}`, d[0] >= 0xf0 ? 'clock' : '');
       post({ kind: 'midi', port: input.name, bytes: [...d], text });
     };
@@ -126,11 +146,13 @@ async function start() {
     return;
   }
   try {
-    const access = await navigator.requestMIDIAccess({ sysex: false });
+    const access = await navigator.requestMIDIAccess({ sysex: true });
     $('status').textContent = 'MIDI access granted';
     $('status').className = 'status ok';
+    midiAccess = access; fillOutputs();
     showDevices(access);
     access.onstatechange = e => {
+      fillOutputs();
       line(`-- ${e.port.type} "${e.port.name}" ${e.port.state}`, 'new');
       showDevices(access);
     };
@@ -140,6 +162,51 @@ async function start() {
     post({ kind: 'error', error: String(err) });
   }
 }
+
+// ---- sending test notes -------------------------------------------------------
+let midiAccess = null;
+const outPort = () => midiAccess && midiAccess.outputs.get($('outSel').value);
+function fillOutputs() {
+  const sel = $('outSel'), keep = sel.value;
+  sel.innerHTML = [...midiAccess.outputs.values()].map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  const cp = [...midiAccess.outputs.values()].find(p => /cp ?88|cp ?73|yamaha/i.test(p.name));
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : cp ? cp.id : sel.value;
+}
+const CHORD = [60, 64, 67];
+function chord(ch, ms = 700) {
+  const out = outPort(); if (!out) return;
+  for (const n of CHORD) out.send([0x90 | (ch - 1), n, 100]);
+  setTimeout(() => { for (const n of CHORD) out.send([0x80 | (ch - 1), n, 0]); }, ms);
+  post({ kind: 'send', to: out.name, ch, notes: CHORD });
+  line(`>> sent chord C-E-G on channel ${ch} to ${out.name}`, 'new');
+}
+for (let ch = 1; ch <= 16; ch++) {
+  const b = document.createElement('button'); b.textContent = `Ch ${ch}`; b.onclick = () => chord(ch); $('chans').appendChild(b);
+}
+let sweeping = false;
+$('sweep').onclick = async () => {
+  if (sweeping) return; sweeping = true;
+  post({ kind: 'sweep-start', to: outPort()?.name });
+  for (let ch = 1; ch <= 16; ch++) {
+    $('now').textContent = `Now: channel ${ch}`;
+    chord(ch, 700);
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  $('now').textContent = 'Done'; sweeping = false;
+  post({ kind: 'sweep-end' });
+};
+$('panic').onclick = () => {
+  const out = outPort(); if (!out) return;
+  for (let c = 0; c < 16; c++) { out.send([0xB0 | c, 123, 0]); out.send([0xB0 | c, 120, 0]); }
+  line('>> all notes off on every channel', 'new');
+};
+$('identify').onclick = () => {
+  const out = outPort(); if (!out) return;
+  $('idres').textContent = 'asking…';
+  out.send([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]);
+  post({ kind: 'identify', to: out.name });
+  setTimeout(() => { if ($('idres').textContent === 'asking…') $('idres').textContent = 'no reply (see Messages)'; }, 1500);
+};
 post({ kind: 'page-open', ua: navigator.userAgent });
 start();
 </script>

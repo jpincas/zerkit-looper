@@ -117,6 +117,16 @@ def strh_r(rt, rn, rm):                # strh rt, [rn, rm]
     return h(0x5200 | rm << 6 | rn << 3 | rt)
 
 
+def strb_r(rt, rn, rm):                # strb rt, [rn, rm]
+    assert rt < 8 and rn < 8 and rm < 8
+    return h(0x5400 | rm << 6 | rn << 3 | rt)
+
+
+def subs_r(rd, rn, rm):                # subs rd, rn, rm
+    assert rd < 8 and rn < 8 and rm < 8
+    return h(0x1A00 | rm << 6 | rn << 3 | rd)
+
+
 def lsls(rd, rm, imm):                 # lsls rd, rm, #imm5
     assert rd < 8 and rm < 8 and 0 < imm < 32
     return h(imm << 6 | rm << 3 | rd)

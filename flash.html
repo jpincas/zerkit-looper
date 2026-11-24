@@ -44,7 +44,8 @@
   <div class="panel">
     <h2>2. Choose what to install</h2>
     <div class="row">
-      <button id="pick-loop" class="primary" disabled>Install LOOP04 (takeover + lights)</button>
+      <button id="pick-loop" class="primary" disabled>Install LOOP05 (takeover + lights + knob brightness)</button>
+      <button id="pick-loop4" disabled>Install LOOP04 (previous)</button>
       <button id="pick-diag" disabled>Install LOOP3D (diagnostic)</button>
       <button id="pick-stock" disabled>Restore official 1.2.1</button>
     </div>
@@ -69,7 +70,9 @@
 <script>
 // Only these exact files can be sent (SHA-256 of the .syx).
 const FILES = {
-  loop: { url: '/circuit/build/circuittracks-4486-LOOP04.syx', name: 'LOOP04: full takeover + the app controls the lights',
+  loop: { url: '/circuit/build/circuittracks-4486-LOOP05.syx', name: 'LOOP05: full takeover + the app controls the lights and knob brightness',
+          sha: '55f39fb5f88b92d35e5d7477d397b44ba193cdb90777738efa6a015604d87640' },
+  loop4: { url: '/circuit/build/circuittracks-4486-LOOP04.syx', name: 'LOOP04: full takeover + the app controls the lights',
           sha: '29829f07170018848ae9ed59fb1cbc8cc029ac1b6439c72fb5b1d527c092fb5d' },
   diag: { url: '/circuit/build/circuittracks-4486-LOOP3D.syx', name: 'LOOP3D: diagnostic takeover (reports the MIDI gate after every message)',
           sha: '7a302e46636aa0985ac85d72c31de76d2bf7962bf942c2b5b47b5905eaa7d39a' },
@@ -129,7 +132,7 @@ $('check').onclick = async () => {
   } else {
     $('device').textContent = `Running normal firmware (build ${build}). Restart it in recovery mode first.`; $('device').className = 'warn';
   }
-  $('pick-loop').disabled = $('pick-diag').disabled = $('pick-stock').disabled = mode !== 'bootloader';
+  $('pick-loop').disabled = $('pick-loop4').disabled = $('pick-diag').disabled = $('pick-stock').disabled = mode !== 'bootloader';
 };
 
 async function sha256(buf) {
@@ -160,6 +163,7 @@ async function choose(key) {
   $('confirm').hidden = false;
 }
 $('pick-loop').onclick = () => choose('loop');
+$('pick-loop4').onclick = () => choose('loop4');
 $('pick-stock').onclick = () => choose('stock');
 $('pick-diag').onclick = () => choose('diag');
 $('cancel').onclick = () => { $('confirm').hidden = true; };
@@ -167,7 +171,7 @@ $('cancel').onclick = () => { $('confirm').hidden = true; };
 // Transfer: send INIT + HEADER, then one message each time the device asks for the next.
 $('go').onclick = () => {
   $('confirm').hidden = true;
-  $('check').disabled = $('pick-loop').disabled = $('pick-diag').disabled = $('pick-stock').disabled = true;
+  $('check').disabled = $('pick-loop').disabled = $('pick-loop4').disabled = $('pick-diag').disabled = $('pick-stock').disabled = true;
   $('abort').disabled = false;
   xfer = { next: 0, last: -1, timer: null };
   inp.addEventListener('midimessage', onMsg);
@@ -209,7 +213,7 @@ function finish(msg, cls) {
   clearTimeout(xfer.timer); inp.removeEventListener('midimessage', onMsg); xfer = null;
   phase(msg, cls); log(msg, cls);
   $('abort').disabled = true; $('check').disabled = false; mode = null;
-  $('pick-loop').disabled = $('pick-diag').disabled = $('pick-stock').disabled = true;
+  $('pick-loop').disabled = $('pick-loop4').disabled = $('pick-diag').disabled = $('pick-stock').disabled = true;
 }
 $('abort').onclick = () => finish('Aborted. The device discards an incomplete update.', 'warn');
 

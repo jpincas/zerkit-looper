@@ -21,12 +21,16 @@
         <div class="readout"><span id="bpm">120</span><small>BPM ↑↓</small></div>
         <button id="tempo-up" class="btn square" title="Tempo up (↑, Shift for 5)">+</button>
         <button id="click" class="btn toggle" title="Metronome (C)">Click<kbd>C</kbd></button>
+        <label class="level" title="Level of the browser sounds (synths, drums, click). Audio tracks aren't affected.">
+          <span>Synths</span><input id="synth-level" type="range" min="0" max="100" step="1">
+        </label>
       </div>
 
       <div class="group grow">
         <div class="readout"><span id="pos">1.1</span><small>BAR.BEAT</small></div>
         <div class="beats" id="beats"><i></i><i></i><i></i><i></i></div>
         <div id="circuit" class="circuit">Circuit: …</div>
+        <div id="midi-in" class="circuit">MIDI in: …</div>
         <div id="status" class="status">Stopped</div>
       </div>
     </header>
@@ -39,6 +43,7 @@
       <div class="seq-head">
         <div class="seq-title" id="seq-title">Track 1</div>
         <select id="inst" class="inst" aria-label="Instrument for the selected track"></select>
+        <select id="input" class="inst" aria-label="Audio input for the selected track" hidden></select>
         <span id="seq-len" class="seq-len"></span>
       </div>
       <canvas id="roll" class="roll"></canvas>

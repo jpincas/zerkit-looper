@@ -5,11 +5,17 @@ import { INSTRUMENTS, makeNoise } from './instruments.js';
 export class AudioOut {
   constructor(trackCount) {
     this.ctx = new AudioContext({ latencyHint: 'interactive' });
-    this.master = new GainNode(this.ctx, { gain: 0.6 });
+    this.master = new GainNode(this.ctx, { gain: 0.6 });   // browser sounds only; see setSynthLevel
     const comp = new DynamicsCompressorNode(this.ctx, { threshold: -14, ratio: 4 });
     this.master.connect(comp).connect(this.ctx.destination);
     this.noise = makeNoise(this.ctx);
     this.instruments = Array(trackCount).fill('synth'); // keys of INSTRUMENTS
+    // Mixer: each track plays into its own gain, set from volume, mute and solo.
+    this.vol = Array(trackCount).fill(0.8);   // 0-1, 0.8 = unity
+    this.mute = Array(trackCount).fill(false);
+    this.solo = Array(trackCount).fill(false);
+    this.bus = this.vol.map(() => new GainNode(this.ctx, { gain: 1 }));
+    this.bus.forEach(g => g.connect(this.master));
     this.live = new Map();      // "track:note" -> voice (keys held right now)
     this.scheduled = new Set(); // voices/clicks scheduled by the engine
   }
@@ -19,20 +25,44 @@ export class AudioOut {
   // Browsers only start audio after a user gesture.
   resume() { if (this.ctx.state !== 'running') this.ctx.resume(); }
 
+  // A track is heard unless it's muted, or another track is soloed and it isn't.
+  audible(t) { return !this.mute[t] && (this.solo[t] || !this.solo.some(Boolean)); }
+
+  mix() {
+    const now = this.now();
+    this.bus.forEach((g, t) => {
+      const v = this.vol[t];
+      g.gain.setTargetAtTime(this.audible(t) ? (v * v) / 0.64 : 0, now, 0.015);
+    });
+  }
+
+  // Level of the browser sounds (synths, drums, click), 0-1. Audio tracks don't pass through it.
+  setSynthLevel(level) { this.master.gain.setTargetAtTime(1.2 * level * level, this.now(), 0.02); }
+
+  // Synth tracks share the master stage (level and compressor, tuned for the browser sounds).
+  // Audio tracks skip it and go straight out, so a loop plays back at the level it was recorded.
+  route(track) {
+    const g = this.bus[track];
+    g.disconnect();
+    g.connect(INSTRUMENTS[this.instruments[track]].audio ? this.ctx.destination : this.master);
+  }
+
   setInstrument(track, name) {
     this.instruments[track] = name;
+    this.route(track);
     for (const [key, v] of this.live) {
       if (key.startsWith(`${track}:`)) { v.kill(this.now()); this.live.delete(key); }
     }
   }
 
   voice(track, note, vel, t, onEnd) {
-    return INSTRUMENTS[this.instruments[track]].voice(this.ctx, this.master, note, vel, t, onEnd, this.noise);
+    return INSTRUMENTS[this.instruments[track]].voice(this.ctx, this.bus[track], note, vel, t, onEnd, this.noise);
   }
 
   noteOn(track, note, vel) {
     this.resume();
     this.noteOff(track, note);
+    if (!INSTRUMENTS[this.instruments[track]].voice) return;      // audio tracks don't play notes
     this.live.set(`${track}:${note}`, this.voice(track, note, vel, this.now(), () => {}));
   }
 
@@ -44,7 +74,23 @@ export class AudioOut {
     v.release(this.now());
   }
 
+  // Audio tracks: play one pass of a recorded clip into the track's mixer channel.
+  playClip(track, clip, when, offset) {
+    const buffer = clip.buffer();
+    if (!buffer) return;
+    const now = this.now();
+    if (when < now) { offset += now - when; when = now; }
+    if (offset >= clip.seconds) return;
+    const src = new AudioBufferSourceNode(this.ctx, { buffer });
+    src.connect(this.bus[track]);
+    src.start(when, offset, clip.seconds - offset);
+    const v = { kill: t => { try { src.stop(t); } catch {} } };
+    src.onended = () => { src.disconnect(); this.scheduled.delete(v); };
+    this.scheduled.add(v);
+  }
+
   playNote(track, note, vel, on, off) {
+    if (!INSTRUMENTS[this.instruments[track]].voice) return;
     const v = this.voice(track, note, vel, Math.max(on, this.now()), () => this.scheduled.delete(v));
     v.release(off);
     this.scheduled.add(v);
