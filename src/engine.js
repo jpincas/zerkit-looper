@@ -1,18 +1,17 @@
-// Transport + open-ended, bar-quantised multi-track looper.
+// Transport + open-ended, bar-quantised multi-track looper where every track has its own
+// loop length (like Maschine): a 1-bar drum loop simply cycles 8 times under an 8-bar bass.
 //
-// Every musical position is stored in beats (quarter notes), never seconds,
-// so a tempo change just rescales playback.
-//
-// All tracks share one loop length, set by the first take on any track.
-// Recording always goes into the selected track.
+// Every musical position is in beats (quarter notes), never seconds, so tempo changes just
+// rescale playback. All tracks run on one clock: a track's position is
+// (beat - track.loop.origin) mod track.loop.length, so the alignment you heard while
+// recording is kept. Stop + Play restarts from the top of the longest loop.
 //
 // The engine has no idea what makes the sound. It talks to an `out` object with:
 //   now()                                        -> audio-clock time in seconds
 //   noteOn(track, note, vel) / noteOff(track, note)      (live, immediate)
-//   playNote(track, note, vel, onTime, offTime)          (scheduled, from the loop)
+//   playNote(track, note, vel, onTime, offTime)          (scheduled, from the loops)
 //   click(time, accent)
 //   cancelScheduled()
-// Today that's Web Audio; later it can be a Web MIDI / CoreMIDI output.
 
 const LOOKAHEAD = 0.12;   // seconds of events scheduled ahead of "now"
 const EARLY_GRACE = 0.25; // beats: a first note this close before a bar line starts the take on it
@@ -31,24 +30,24 @@ export class Engine {
     // beat = anchorBeat + (time - anchorTime) * bpm / 60
     this.anchorTime = 0;
     this.anchorBeat = 0;
-    this.scheduledTo = 0; // beat up to which events have been handed to `out`
+    this.scheduledTo = 0;
 
-    // Record states:
-    //   idle      - nothing recording (looping if a loop exists)
-    //   armed     - waiting for the first note, which fixes where the take starts
-    //   recording - open-ended first take
-    //   closing   - X pressed; still recording until the end of the current bar
-    //   overdub   - recording into an existing loop
+    // Record states (one recording at a time, into recTrack):
+    //   idle      - nothing recording
+    //   armed     - waiting for the first note on recTrack, which fixes where the take starts
+    //   recording - open-ended take on an empty track
+    //   closing   - Record pressed; still recording until the end of the current bar
+    //   overdub   - recording into recTrack's existing loop, at its length
     this.rec = 'idle';
+    this.recTrack = 0;
     this.recStart = 0;
     this.recEnd = 0;
 
-    this.tracks = Array.from({ length: trackCount }, () => ({ notes: [] }));
+    // Each track: { notes, loop: { origin, length, playFrom } | null }
+    this.tracks = Array.from({ length: trackCount }, () => ({ notes: [], loop: null }));
     this.selected = 0;
-    this.loop = null; // { origin, length, playFrom } - all in beats, shared by every track
-    this.pass = 0;    // recording pass number, stamped on each note (for undo)
-
-    this.held = new Map(); // "track:note" -> recorded note still waiting for its note-off
+    this.pass = 0;          // recording pass number, stamped on each note (for undo)
+    this.held = new Map();  // "track:note" -> recorded note still waiting for its note-off
   }
 
   // ---- time ---------------------------------------------------------------
@@ -60,25 +59,41 @@ export class Engine {
   beatAtTime(t) { return this.anchorBeat + (t - this.anchorTime) * this.bpm / 60; }
   timeAt(beat) { return this.anchorTime + (beat - this.anchorBeat) * 60 / this.bpm; }
   nextBar(beat) { return (Math.floor(beat / this.beatsPerBar) + 1) * this.beatsPerBar; }
-  loopPos(beat) { return mod(beat - this.loop.origin, this.loop.length); }
+  trackPos(t, beat) { const l = this.tracks[t].loop; return mod(beat - l.origin, l.length); }
+
+  // The longest loop: the "song" the transport restarts from, and the display's timeline.
+  get master() {
+    let best = null;
+    for (const t of this.tracks) if (t.loop && (!best || t.loop.length > best.length)) best = t.loop;
+    return best;
+  }
+  get loop() { return this.master; } // for callers that only ask "is anything looping, and how long?"
   isEmpty() { return this.tracks.every(t => t.notes.length === 0); }
 
   // ---- transport ----------------------------------------------------------
 
   start(lead = 0.05) {
     if (this.playing) return;
+    // Restart from the top of the longest loop, keeping every track's alignment to it.
+    const m = this.master;
+    if (m) {
+      const ref = m.origin;
+      for (const t of this.tracks) {
+        if (!t.loop) continue;
+        t.loop.origin = mod(t.loop.origin - ref, t.loop.length);
+        t.loop.playFrom = 0;
+      }
+    }
     this.anchorTime = this.out.now() + lead;
     this.anchorBeat = 0;
     this.scheduledTo = 0;
     this.playing = true;
-    if (this.loop) { this.loop.origin = 0; this.loop.playFrom = 0; }
   }
 
   stop() {
     if (!this.playing) return;
     const b = this.beat();
-    // Stopping mid-take keeps it: the loop closes at the end of the current bar.
-    if (this.rec === 'recording') this.closeTake(b);
+    if (this.rec === 'recording') this.closeTake(b);    // stopping mid-take keeps it
     if (this.rec === 'closing') this.finishTake(Math.min(b, this.recEnd));
     if (this.rec === 'overdub') this.rec = 'idle';
     for (const n of this.held.values()) this.finalize(n, b);
@@ -90,7 +105,7 @@ export class Engine {
 
   setTempo(bpm) {
     bpm = Math.max(30, Math.min(300, Math.round(bpm)));
-    if (this.playing) { // re-anchor so the beat position doesn't jump
+    if (this.playing) {
       const now = this.out.now();
       this.anchorBeat = this.beatAtTime(now);
       this.anchorTime = now;
@@ -108,7 +123,8 @@ export class Engine {
     switch (this.rec) {
       case 'idle':
         this.pass++;
-        this.rec = this.loop ? 'overdub' : 'armed';
+        this.recTrack = this.selected;
+        this.rec = this.tracks[this.recTrack].loop ? 'overdub' : 'armed';
         break;
       case 'armed':
       case 'overdub':
@@ -131,12 +147,16 @@ export class Engine {
     this.rec = 'recording';
   }
 
-  // X pressed during the take: the loop length becomes "up to the end of this bar".
-  // The loop exists from now on (so playback can be scheduled ahead), but we keep
-  // recording into it until the bar line.
+  // Record pressed during the take: this track's length becomes "up to the end of this bar".
+  // The loop exists from now on (so playback is scheduled ahead) but we keep recording into
+  // it until the bar line.
   closeTake(b) {
     this.recEnd = this.nextBar(b);
-    this.loop = { origin: this.recStart, length: this.recEnd - this.recStart, playFrom: this.recEnd };
+    this.tracks[this.recTrack].loop = {
+      origin: this.recStart,
+      length: this.recEnd - this.recStart,
+      playFrom: this.recEnd,          // the first pass was played live
+    };
     this.rec = 'closing';
   }
 
@@ -150,54 +170,55 @@ export class Engine {
   // ---- clearing & undo ------------------------------------------------------
 
   clearAll() {
-    for (const t of this.tracks) t.notes = [];
+    for (const t of this.tracks) { t.notes = []; t.loop = null; }
     this.held.clear();
-    this.loop = null;
     this.rec = 'idle';
     this.resync();
   }
 
   clearTrack(i) {
-    if (this.rec === 'recording' || this.rec === 'closing') return this.clearAll();
+    const recordingHere = this.rec !== 'idle' && this.recTrack === i;
     this.tracks[i].notes = [];
+    this.tracks[i].loop = null;
     this.dropHeld(n => n.track === i);
-    this.afterRemoval();
+    if (recordingHere) this.rec = 'idle';
+    this.resync();
   }
 
-  // Z: throw away whatever was recorded most recently, on any track.
-  //   - during the first take: drop it and stay armed, ready for another go
+  // Undo: throw away the most recent recording - one take or one overdub pass, on the one
+  // track it was recorded on. Nothing else is touched.
+  //   - during a take: drop it and stay armed, ready for another go
   //   - during an overdub: drop this pass and stop overdubbing
-  //   - otherwise: drop the latest pass; once nothing is left, the loop goes too
+  //   - otherwise: drop the latest pass; a track left empty loses its length
   undo() {
     if (this.rec === 'recording' || this.rec === 'closing') {
-      this.clearAll();
+      this.removePass(this.pass);
+      this.tracks[this.recTrack].loop = null;
       this.pass++;
       this.rec = 'armed';
+      this.resync();
       return;
     }
-    if (!this.loop) return;
     let last = -1;
     if (this.rec === 'overdub') { last = this.pass; this.rec = 'idle'; }
     else for (const t of this.tracks) for (const n of t.notes) last = Math.max(last, n.pass);
-    for (const t of this.tracks) t.notes = t.notes.filter(n => n.pass !== last);
-    this.dropHeld(n => n.pass === last);
-    this.afterRemoval();
+    if (last >= 0) this.removePass(last);
+    this.resync();
+  }
+
+  removePass(p) {
+    for (const t of this.tracks) {
+      t.notes = t.notes.filter(n => n.pass !== p);
+      if (t.notes.length === 0) t.loop = null;
+    }
+    this.dropHeld(n => n.pass === p);
   }
 
   dropHeld(match) {
     for (const [key, n] of this.held) if (match(n)) this.held.delete(key);
   }
 
-  afterRemoval() {
-    if (this.isEmpty()) {
-      this.loop = null;
-      if (this.rec === 'overdub') this.rec = 'idle';
-    }
-    this.resync();
-  }
-
-  // Drop everything already handed to the output and schedule again from now,
-  // so removed notes don't sound and remaining ones (and clicks) still do.
+  // Drop everything already handed to the output and schedule again from now.
   resync() {
     this.out.cancelScheduled();
     if (this.playing) this.scheduledTo = this.beat();
@@ -207,11 +228,13 @@ export class Engine {
 
   noteOn(track, note, vel = 100) {
     this.out.noteOn(track, note, vel);
-    if (this.rec === 'armed' && !this.playing) this.start(0); // first note starts everything, on beat 1
+    const intoRec = track === this.recTrack;
+    if (this.rec === 'armed' && intoRec && !this.playing) this.start(0); // first note starts everything, on beat 1
     if (!this.playing) return;
     const b = this.beat();
     const key = `${track}:${note}`;
     if (this.held.has(key)) { this.finalize(this.held.get(key), b); this.held.delete(key); }
+    if (!intoRec) return;
 
     if (this.rec === 'armed') this.beginTake(b);
     if (this.rec === 'closing' && b >= this.recEnd) this.finishTake(this.recEnd);
@@ -221,7 +244,7 @@ export class Engine {
       const pressed = Math.max(b, this.recStart);
       n = { track, note, vel, start: pressed - this.recStart, dur: null, pressed, kind: 'take', pass: this.pass };
     } else if (this.rec === 'overdub') {
-      n = { track, note, vel, start: this.loopPos(b), dur: null, pressed: b, kind: 'dub', pass: this.pass };
+      n = { track, note, vel, start: this.trackPos(track, b), dur: null, pressed: b, kind: 'dub', pass: this.pass };
     }
     if (n) {
       this.tracks[track].notes.push(n);
@@ -240,9 +263,11 @@ export class Engine {
 
   finalize(n, b) {
     let end = b;
-    if (n.kind === 'take' && this.rec !== 'recording') end = Math.min(end, this.recEnd);
+    const takeOpen = this.rec === 'recording' && n.track === this.recTrack;
+    if (n.kind === 'take' && !takeOpen) end = Math.min(end, this.recEnd);
     n.dur = Math.max(MIN_DUR, end - n.pressed);
-    if (n.kind === 'dub' && this.loop) n.dur = Math.min(n.dur, this.loop.length);
+    const loop = this.tracks[n.track].loop;
+    if (n.kind === 'dub' && loop) n.dur = Math.min(n.dur, loop.length);
   }
 
   // ---- scheduler (call every ~25ms) ----------------------------------------
@@ -261,61 +286,87 @@ export class Engine {
       }
     }
 
-    if (this.loop) {
-      const { origin, length: L, playFrom } = this.loop;
+    this.tracks.forEach((t, ti) => {
+      if (!t.loop) return;
+      const { origin, length: L, playFrom } = t.loop;
       const lo = Math.max(from, playFrom);
-      this.tracks.forEach((t, ti) => {
-        for (const n of t.notes) {
-          if (n.dur == null) continue; // still held
-          let k = Math.ceil((lo - origin - n.start) / L - 1e-9);
-          for (let abs = origin + k * L + n.start; abs < to; k++, abs = origin + k * L + n.start) {
-            if (abs >= lo) this.out.playNote(ti, n.note, n.vel, this.timeAt(abs), this.timeAt(abs + n.dur));
-          }
+      for (const n of t.notes) {
+        if (n.dur == null) continue; // still held
+        let k = Math.ceil((lo - origin - n.start) / L - 1e-9);
+        for (let abs = origin + k * L + n.start; abs < to; k++, abs = origin + k * L + n.start) {
+          if (abs >= lo) this.out.playNote(ti, n.note, n.vel, this.timeAt(abs), this.timeAt(abs + n.dur));
         }
-      });
-    }
+      }
+    });
     this.scheduledTo = to;
   }
 
   // ---- read-only helpers for the UI ----------------------------------------
 
-  // What a track's piano roll should show: visible span (beats), playhead, notes.
-  view(i) {
+  // The shared timeline every lane is drawn on: where it starts (in beats), how long it is,
+  // and where the playhead is on it.
+  display() {
     const bpb = this.beatsPerBar;
     const b = this.beat();
-    const notes = this.tracks[i].notes;
-    const here = i === this.selected;
-    if (this.loop) {
-      return {
-        span: this.loop.length,
-        head: this.playing ? this.loopPos(b) : 0,
-        notes,
-        recording: here && (this.rec === 'closing' || this.rec === 'overdub'),
-      };
-    }
-    if (this.rec === 'recording') {
+    const m = this.master;
+    const mLen = m ? m.length : 0;
+    if (this.rec === 'recording' || this.rec === 'closing') {
       const rel = b - this.recStart;
-      const bars = Math.max(4, Math.floor(rel / bpb) + 2); // always one empty bar ahead
-      return { span: bars * bpb, head: rel, notes, recording: here };
+      const take = this.rec === 'closing' ? this.recEnd - this.recStart
+        : Math.max(m ? 0 : 4 * bpb, (Math.floor(rel / bpb) + 2) * bpb); // one empty bar ahead
+      return { anchor: this.recStart, span: Math.max(mLen, take), head: Math.max(0, rel), recording: true };
     }
-    // No loop yet (armed or not): nothing to show beyond bar 1, so circle round it.
-    return {
-      span: 4 * bpb,
-      head: this.playing ? mod(Math.max(b, 0), bpb) : 0,
-      notes,
-      recording: here && this.rec === 'armed',
-    };
+    if (m) {
+      return { anchor: m.origin, span: m.length, head: this.playing ? mod(b - m.origin, m.length) : 0,
+               recording: this.rec === 'overdub' };
+    }
+    // Nothing recorded: nothing to show beyond bar 1, so the playhead circles round it.
+    return { anchor: 0, span: 4 * bpb, head: this.playing ? mod(Math.max(b, 0), bpb) : 0, recording: this.rec === 'armed' };
   }
 
-  // A track's loop notes sounding right now (for lighting up the keyboard).
+  // A track's notes projected onto the shared timeline. Shorter loops repeat; repeats
+  // after the first pass of the loop are marked ghost so the UI can draw them fainter.
+  view(i) {
+    const d = this.display();
+    const t = this.tracks[i];
+    const b = this.beat();
+    const here = this.rec !== 'idle' && this.recTrack === i;
+    const notes = [];
+    for (const n of t.notes) {
+      if (n.dur == null) {                         // held right now: draw from press to playhead
+        const x = n.pressed - d.anchor;
+        if (t.loop && this.rec === 'overdub') {
+          const xs = mod(n.pressed - d.anchor, d.span);
+          notes.push({ note: n.note, start: xs, dur: Math.max(0, b - n.pressed), held: true });
+        } else if (x >= 0 && x < d.span) {
+          notes.push({ note: n.note, start: x, dur: Math.max(0, b - n.pressed), held: true });
+        }
+        continue;
+      }
+      if (!t.loop) {                               // open take: no repeats yet
+        const x = this.recStart + n.start - d.anchor;
+        if (x >= 0 && x < d.span) notes.push({ note: n.note, start: x, dur: n.dur });
+        continue;
+      }
+      const { origin, length: L } = t.loop;
+      let k = Math.ceil((d.anchor - origin - n.start) / L - 1e-9);
+      for (let x = origin + k * L + n.start - d.anchor; x < d.span; k++, x += L) {
+        notes.push({ note: n.note, start: x, dur: n.dur, ghost: x >= L });
+      }
+    }
+    return { span: d.span, head: d.head, notes, recording: here && d.recording, length: t.loop ? t.loop.length : 0 };
+  }
+
+  // A track's loop notes sounding right now (for lighting up keyboards).
   loopSounding(i) {
     const s = new Set();
-    if (!this.loop || !this.playing) return s;
+    const t = this.tracks[i];
+    if (!t.loop || !this.playing) return s;
     const b = this.beat();
-    if (b < this.loop.playFrom) return s;
-    const pos = this.loopPos(b);
-    for (const n of this.tracks[i].notes) {
-      if (n.dur != null && mod(pos - n.start, this.loop.length) < n.dur) s.add(n.note);
+    if (b < t.loop.playFrom) return s;
+    const pos = this.trackPos(i, b);
+    for (const n of t.notes) {
+      if (n.dur != null && mod(pos - n.start, t.loop.length) < n.dur) s.add(n.note);
     }
     return s;
   }

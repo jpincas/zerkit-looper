@@ -78,23 +78,23 @@ export function drawRoll(canvas, view, beatsPerBar, rows, color) {
     }
   }
 
-  // Notes
+  // Notes (already projected onto the shared timeline; repeats of shorter loops are "ghost")
   const inset = rowH > 6 ? 1.5 : 0.5;
   for (const n of view.notes) {
     const r = rows.rowOf(n.note);
     if (r < 0) continue;
-    let dur = n.dur;
-    if (dur == null) dur = view.head >= n.start ? view.head - n.start : view.span - n.start; // still held
-    ctx.fillStyle = n.dur == null ? C.held : view.recording ? C.noteRec : color;
+    ctx.fillStyle = n.held ? C.held : view.recording ? C.noteRec : color;
+    ctx.globalAlpha = n.ghost ? 0.38 : 1;
     const y = rowY(r) + inset;
     const hgt = Math.max(1, rowH - inset * 2);
     const x0 = x(n.start);
-    fillRound(ctx, x0 + 1, y, Math.max(3, x(Math.min(n.start + dur, view.span)) - x0 - 2), hgt);
-    // Overdubbed notes that run past the loop end wrap round to the start.
-    if (n.start + dur > view.span) {
-      fillRound(ctx, x(0) + 1, y, Math.max(3, x(n.start + dur - view.span) - x(0) - 2), hgt);
+    fillRound(ctx, x0 + 1, y, Math.max(3, x(Math.min(n.start + n.dur, view.span)) - x0 - 2), hgt);
+    // A note that runs past the end of the timeline wraps round to the start.
+    if (n.start + n.dur > view.span) {
+      fillRound(ctx, x(0) + 1, y, Math.max(3, x(n.start + n.dur - view.span) - x(0) - 2), hgt);
     }
   }
+  ctx.globalAlpha = 1;
 
   // Playhead
   const hx = Math.round(x(view.head)) + 0.5;

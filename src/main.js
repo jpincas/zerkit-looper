@@ -3,8 +3,11 @@ import { AudioOut } from './audio.js';
 import { KEYS, NOTE_NAMES, isBlack, keyLetter } from './keys.js';
 import { INSTRUMENTS, DRUM_BASE, DRUM_SHORT, drumIndex } from './instruments.js';
 import { drawRoll } from './roll.js';
+import { connectCircuit } from './circuit.js';
 
-const DEFAULTS = ['synth', 'drums', 'bass', 'keys']; // one per track
+// One per track, laid out like the Circuit's track buttons: Synth 1-2, MIDI 1-2, Drum 1-4.
+// Separate drum tracks let drum parts have their own loop lengths (1-bar kick, 2-bar hats...).
+const DEFAULTS = ['synth', 'bass', 'keys', 'pad', 'drums', 'drums', 'drums', 'drums'];
 const TRACKS = DEFAULTS.length;
 
 const audio = new AudioOut(TRACKS);
@@ -60,27 +63,28 @@ $('tempo-down').onclick = () => actions.tempo(-1);
 $('oct-up').onclick = () => actions.octave(1);
 $('oct-down').onclick = () => actions.octave(-1);
 
-// ---- track lanes ------------------------------------------------------------
+// ---- track buttons + the selected track's sequencer -----------------------------
 
-const options = Object.entries(INSTRUMENTS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
-const lanes = [];
+const tbtns = [];
 for (let t = 0; t < TRACKS; t++) {
-  const el = document.createElement('div');
-  el.className = 'lane';
-  el.innerHTML = `
-    <div class="lane-head">
-      <div class="lane-title"><kbd>${t + 1}</kbd> Track ${t + 1}</div>
-      <select class="inst" aria-label="Track ${t + 1} instrument">${options}</select>
-    </div>
-    <canvas class="roll"></canvas>`;
-  el.addEventListener('pointerdown', () => actions.select(t));
-  const select = el.querySelector('select');
-  select.value = audio.instruments[t];
-  // Blur after choosing so Space/arrows go back to the looper, not the dropdown.
-  select.addEventListener('change', () => { actions.instrument(t, select.value); select.blur(); });
-  $('tracks').appendChild(el);
-  lanes.push({ el, canvas: el.querySelector('canvas'), select });
+  const el = document.createElement('button');
+  el.className = 'tbtn';
+  el.title = `Track ${t + 1} (${t + 1})`;
+  el.innerHTML = `<span class="tnum">${t + 1}</span><span class="tname"></span><span class="tlen"></span><i class="tdot"></i>`;
+  el.addEventListener('click', () => actions.select(t));
+  $('trackbar').appendChild(el);
+  tbtns.push({ el, name: el.querySelector('.tname'), len: el.querySelector('.tlen'), dot: el.querySelector('.tdot') });
 }
+
+const instSelect = $('inst');
+instSelect.innerHTML = Object.entries(INSTRUMENTS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
+// Blur after choosing so Space/arrows go back to the looper, not the dropdown.
+instSelect.addEventListener('change', () => { actions.instrument(engine.selected, instSelect.value); instSelect.blur(); });
+
+// Browsers keep audio paused until the page gets a click or key press (input from the
+// Circuit doesn't count), so any click or key anywhere turns sound on.
+const soundBlocked = () => audio.ctx.state !== 'running';
+for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => audio.resume(), { capture: true });
 
 // Keep focus off buttons so Space never "clicks" the last-pressed button.
 for (const b of document.querySelectorAll('button')) b.addEventListener('mousedown', e => e.preventDefault());
@@ -111,12 +115,12 @@ function rowsFor(t) {
 // even if the octave or track changed in between.
 const pressed = new Map(); // source id -> { track, note }
 
-function press(src, s) {
+function press(src, s, vel = 100) {
   if (pressed.has(src)) return;
   const track = engine.selected;
   const note = noteFor(track, s);
   pressed.set(src, { track, note });
-  engine.noteOn(track, note, 100);
+  engine.noteOn(track, note, vel);
 }
 function release(src) {
   const p = pressed.get(src);
@@ -184,7 +188,7 @@ const beatDots = [...document.querySelectorAll('#beats i')];
 
 function status() {
   const bpb = engine.beatsPerBar;
-  const track = `track ${engine.selected + 1}`;
+  const track = `track ${engine.recTrack + 1}`;
   switch (engine.rec) {
     case 'armed':
       return `Armed · ${track} · starts on your first note`;
@@ -209,6 +213,7 @@ function frame() {
   const sel = engine.selected;
   const b = engine.beat();
 
+  $('sound-gate').hidden = !soundBlocked();
   setText($('bpm'), String(engine.bpm));
   setText($('status'), status());
   $('play').classList.toggle('on', engine.playing);
@@ -219,18 +224,30 @@ function frame() {
   const beatIdx = engine.playing && b >= 0 ? Math.floor(b % bpb) : -1;
   beatDots.forEach((d, i) => d.classList.toggle('on', i === beatIdx));
 
-  // Lanes
-  lanes.forEach((lane, t) => {
-    const { color } = inst(t);
-    const view = engine.view(t);
-    lane.el.classList.toggle('selected', t === sel);
-    lane.el.style.setProperty('--lane-color', color);
-    if (t === sel) {
-      const pos = view.head;
-      setText($('pos'), engine.playing ? `${Math.floor(pos / bpb) + 1}.${Math.floor(pos % bpb) + 1}` : '1.1');
-    }
-    drawRoll(lane.canvas, view, bpb, rowsFor(t), color);
+  // Track buttons
+  const recTrack = engine.rec !== 'idle' ? engine.recTrack : -1;
+  tbtns.forEach((tb, t) => {
+    const len = engine.tracks[t].loop ? engine.tracks[t].loop.length / bpb : 0;
+    const sounding = engine.loopSounding(t).size > 0 || [...pressed.values()].some(p => p.track === t);
+    tb.el.style.setProperty('--c', inst(t).color);
+    tb.el.classList.toggle('selected', t === sel);
+    tb.el.classList.toggle('rec', t === recTrack);
+    tb.el.classList.toggle('empty', !engine.tracks[t].notes.length);
+    tb.dot.classList.toggle('on', sounding);
+    setText(tb.name, inst(t).name);
+    setText(tb.len, len ? `${len} bar${len > 1 ? 's' : ''}` : '—');
   });
+
+  // The selected track's sequencer
+  const view = engine.view(sel);
+  const { color } = inst(sel);
+  $('seq').style.setProperty('--lane-color', color);
+  setText($('seq-title'), `Track ${sel + 1}`);
+  if (instSelect.value !== audio.instruments[sel] && document.activeElement !== instSelect) instSelect.value = audio.instruments[sel];
+  const bars = view.length / bpb;
+  setText($('seq-len'), bars ? `${bars}-bar loop` : engine.tracks[sel].notes.length ? 'recording…' : 'empty');
+  setText($('pos'), engine.playing ? `${Math.floor(view.head / bpb) + 1}.${Math.floor(view.head % bpb) + 1}` : '1.1');
+  drawRoll($('roll'), view, bpb, rowsFor(sel), color);
 
   // Keyboard: labels, colour and lights follow the selected track
   const drums = isDrums(sel);
@@ -253,3 +270,15 @@ function frame() {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// ---- Novation Circuit Tracks control surface (patched firmware) ---------------
+const app = {
+  engine, audio, actions, press, release, noteFor, isDrums, soundBlocked,
+  heldNotes: t => [...pressed.values()].filter(p => p.track === t).map(p => p.note),
+  onStatus: text => {
+    $('circuit').textContent = `Circuit: ${text}`;
+    $('circuit').classList.toggle('on', text === 'connected');
+  },
+};
+connectCircuit(app);
+window.looper = app; // for debugging from the console

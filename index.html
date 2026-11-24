@@ -26,11 +26,23 @@
       <div class="group grow">
         <div class="readout"><span id="pos">1.1</span><small>BAR.BEAT</small></div>
         <div class="beats" id="beats"><i></i><i></i><i></i><i></i></div>
+        <div id="circuit" class="circuit">Circuit: …</div>
         <div id="status" class="status">Stopped</div>
       </div>
     </header>
 
-    <section class="tracks" id="tracks"></section>
+    <div id="sound-gate" class="sound-gate" hidden>Sound is off: click anywhere on this page to turn it on. Browsers only allow sound after a click or key press on the page.</div>
+
+    <section class="trackbar" id="trackbar"></section>
+
+    <section class="seq" id="seq">
+      <div class="seq-head">
+        <div class="seq-title" id="seq-title">Track 1</div>
+        <select id="inst" class="inst" aria-label="Instrument for the selected track"></select>
+        <span id="seq-len" class="seq-len"></span>
+      </div>
+      <canvas id="roll" class="roll"></canvas>
+    </section>
 
     <section class="keys-area">
       <div class="kb-side">
