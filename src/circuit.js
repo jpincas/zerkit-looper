@@ -37,7 +37,9 @@ function noteModeSemitone(p) {
 export function connectCircuit(app) {
   const { engine, audio, actions } = app;
   let out = null, inp = null, lastFrame = '', lastBright = '';
-  let shift = false, noteMode = false;
+  let shift = false;
+  // Note mode is shared with the screen's Show/Hide panel: one switch, toggled from either.
+  const isNoteMode = () => app.notePanel();
   let tempoHeld = false, tempoTurned = false;    // tap Tempo = click; hold Tempo + filter knob = tempo (+ Shift: swing)
   let lastFilter = null;                         // the master filter knob's last position (0-127)
 
@@ -55,7 +57,7 @@ export function connectCircuit(app) {
 
   function padDown(p, vel) {
     audio.resume();
-    if (noteMode) {
+    if (isNoteMode()) {
       const s = app.isDrums(engine.selected) ? kitPadAt(p) : noteModeSemitone(p);
       if (s != null) return app.press(`circuit${p}`, s, Math.max(1, vel));
       if (!app.isDrums(engine.selected)) return;    // drum tracks: rows 1-2 stay mute / solo
@@ -69,7 +71,7 @@ export function connectCircuit(app) {
     if (id === BTN.shift) { shift = app.circuitShift = true; return; }
     if (TRACK_BTNS.includes(id)) return actions.select(id);
     switch (id) {
-      case BTN.note: noteMode = !noteMode; return;
+      case BTN.note: return actions.toggleNotes();
       case BTN.quant: return actions.quant();             // 1-16/17-32: the selected track's record quantise
       case BTN.play: return actions.play();
       case BTN.record: return actions.record();
@@ -77,7 +79,7 @@ export function connectCircuit(app) {
       case BTN.octUp: return shift ? actions.transpose(1) : actions.octave(1);
       case BTN.tempo: tempoHeld = true; tempoTurned = false; app.holding = 'tempo'; return;
       case BTN.preset: return shift ? actions.togglePage('presets') : actions.nextInstrument(1);   // Shift: Presets page
-      case BTN.kits: return shift ? actions.togglePage('kits') : undefined;                     // the Patterns button
+      case BTN.kits: return shift ? actions.togglePage('kits') : actions.nextKit();            // the Patterns button
       case BTN.save: return shift ? app.session.saveAs() : app.session.save();
       case BTN.open: return shift ? app.session.newProject() : app.session.open();              // the Projects button
       case BTN.clear: return shift ? actions.clearTrack() : actions.undo();
@@ -126,7 +128,7 @@ export function connectCircuit(app) {
     f[ledBtn(BTN.kits)] = app.page() === 'kits' ? C.white : C.dim;
     f[ledBtn(BTN.save)] = projectDirty ? C.white : C.dim;                 // white: unsaved changes
     f[ledBtn(BTN.open)] = C.dim;
-    f[ledBtn(BTN.note)] = noteMode ? C.white : C.dim;
+    f[ledBtn(BTN.note)] = isNoteMode() ? C.white : C.dim;
     f[ledBtn(BTN.play)] = app.soundBlocked?.() ? (blink ? C.red : C.off)     // sound blocked: click the page
       : engine.playing ? C.green : C.dim;
     f[ledBtn(BTN.record)] = {
@@ -149,8 +151,8 @@ export function connectCircuit(app) {
     }
     f[KNOB_LED + 8] = tempoHeld ? (shift ? C.amber : C.white) : C.off;
 
-    if (noteMode && app.isDrums(sel)) kitLights(f, sel, instCode);
-    else if (noteMode) noteLights(f, sel, instCode);
+    if (isNoteMode() && app.isDrums(sel)) kitLights(f, sel, instCode);
+    else if (isNoteMode()) noteLights(f, sel, instCode);
     else trackLights(f, sel, instCode);
     return f;
   }
@@ -218,7 +220,7 @@ export function connectCircuit(app) {
   setInterval(() => { sendFrame(); sendBrightness(); }, 30);
   let projectDirty = false;                       // checked less often: it compares the whole project
   setInterval(() => { projectDirty = !!app.session?.dirty(); }, 300);
-  app.circuitMode = () => (noteMode ? 'note' : 'track');
+  app.circuitMode = () => (isNoteMode() ? 'note' : 'track');
 
   // ---- connection --------------------------------------------------------------
   if (!navigator.requestMIDIAccess) { app.onStatus?.('no Web MIDI'); return; }

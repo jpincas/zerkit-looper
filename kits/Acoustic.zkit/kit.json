@@ -1,0 +1,71 @@
+{
+ "format": "zerkit-kit",
+ "version": 1,
+ "name": "Acoustic",
+ "pads": [
+  {
+   "file": "01-kick.flac",
+   "label": "Kick"
+  },
+  {
+   "file": "02-snare.flac",
+   "label": "Snare"
+  },
+  {
+   "file": "03-snare-muted.flac",
+   "label": "Snare Muted"
+  },
+  {
+   "file": "04-cross-stick.flac",
+   "label": "Cross Stick"
+  },
+  {
+   "file": "05-closed-hh.flac",
+   "label": "Closed HH"
+  },
+  {
+   "file": "06-pedal-hh.flac",
+   "label": "Pedal HH"
+  },
+  {
+   "file": "07-open-hh.flac",
+   "label": "Open HH"
+  },
+  {
+   "file": "08-rimshot.flac",
+   "label": "Rimshot"
+  },
+  {
+   "file": "09-low-tom.flac",
+   "label": "Low Tom"
+  },
+  {
+   "file": "10-low-tom-muted.flac",
+   "label": "Low Tom Muted"
+  },
+  {
+   "file": "11-high-tom.flac",
+   "label": "High Tom"
+  },
+  {
+   "file": "12-high-tom-edge.flac",
+   "label": "High Tom Edge"
+  },
+  {
+   "file": "13-crash.flac",
+   "label": "Crash"
+  },
+  {
+   "file": "14-ride.flac",
+   "label": "Ride"
+  },
+  {
+   "file": "15-flat-ride.flac",
+   "label": "Flat Ride"
+  },
+  {
+   "file": "16-ride-bell.flac",
+   "label": "Ride Bell"
+  }
+ ]
+}

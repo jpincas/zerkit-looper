@@ -6,7 +6,7 @@ import { Projects, supported } from './projects.js';
 const FORMAT = 'zerkit-project', VERSION = 1;
 
 export function setupSession(ctx) {
-  const { engine, audio, actions, octaves, trackInput, presetOn, makeClip, inputs, useInput, chooseDefaultInput, DEFAULTS, INSTRUMENTS } = ctx;
+  const { engine, audio, actions, octaves, trackInput, presetOn, kitOn, makeClip, inputs, useInput, chooseDefaultInput, DEFAULTS, INSTRUMENTS } = ctx;
   const store = new Projects();
   let name = null;             // the current project's name (null: never saved)
   let savedKey = null;         // what it looked like when last saved or opened, to tell if it's changed
@@ -40,6 +40,7 @@ export function setupSession(ctx) {
       tempo: engine.bpm, swing: engine.swing, click: engine.click, beatsPerBar: engine.beatsPerBar,
       nextPass: engine.pass,
       presetsOn: { ...presetOn },
+      kitsOff: Object.keys(kitOn).filter(k => kitOn[k] === false).sort(),   // kits start on, so only the off ones
       tracks,
     };
     return { json, audioFiles };
@@ -69,7 +70,10 @@ export function setupSession(ctx) {
     engine.setSwing(json.swing ?? 50);
     engine.click = json.click ?? true;
     Object.assign(presetOn, json.presetsOn ?? {});
+    for (const k of Object.keys(kitOn)) kitOn[k] = !(json.kitsOff ?? []).includes(k);
+    const lost = new Set();
     json.tracks.forEach((t, i) => {
+      if (!INSTRUMENTS[t.instrument]) { lost.add(t.instrument.replace(/^kit:/, '')); t.instrument = 'drums'; }   // a kit that's gone
       actions.instrument(i, t.instrument);
       octaves[i] = t.octave ?? octaves[i];
       const tr = engine.tracks[i];
@@ -84,6 +88,7 @@ export function setupSession(ctx) {
       if (INSTRUMENTS[t.instrument].audio) reconnectInput(i, t.input);
     });
     audio.mix();
+    if (lost.size) setTimeout(() => toast(`Kit${lost.size > 1 ? 's' : ''} not found: ${[...lost].join(', ')} (using Drums)`, 'warn'), 1400);
     engine.pass = json.nextPass ?? 1 + Math.max(0, ...json.tracks.flatMap(t => [...(t.notes ?? []), ...(t.clips ?? [])].map(n => n.pass)));
   }
 
@@ -100,6 +105,7 @@ export function setupSession(ctx) {
     engine.setTempo(120);
     engine.setSwing(50);
     for (const k of Object.keys(presetOn)) presetOn[k] = true;
+    for (const k of Object.keys(kitOn)) kitOn[k] = true;
     DEFAULTS.forEach((inst, i) => {
       actions.instrument(i, inst);
       engine.tracks[i].quant = 'off';
@@ -148,6 +154,7 @@ export function setupSession(ctx) {
   async function openProject(n) {
     try {
       const { json, audio: loadAudio } = await store.load(n, audio.ctx);
+      await ctx.beforeRestore?.();                  // e.g. the kit library, so the project's kits exist
       await restore(json, loadAudio);
       name = n;
       savedKey = keyOf(snapshot().json);
@@ -285,6 +292,9 @@ export function setupSession(ctx) {
   savedKey = keyOf(snapshot().json);   // a fresh page counts as unchanged
 
   return {
+    store,
+    toast,
+    ensureAccess,
     save() { if (name) write(name); else nameBox('Save project', 'Untitled'); },
     saveAs() { nameBox('Save as', name ? `${name} copy` : 'Untitled'); },
     open() { if (dialog.hidden) openList(); else closeDialog(); },

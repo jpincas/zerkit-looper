@@ -62,7 +62,7 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   press `1`–`8`, or press its Circuit button to select it.
 - **Pages:** the pad area shows the Looper, or another page. Shift + Preset opens **Presets**:
   every preset with a switch for whether Preset cycles through it (and which tracks use it).
-  Shift + Kits (the Circuit's Patterns button) opens **Kits**, to come. The same again goes back.
+  Shift + Kits (the Circuit's Patterns button) opens **Kits** (see below). The same again goes back.
 - **Pads:** a mute strip and a solo strip, one pad under each track, sharing the first pad row.
   Below them, filling the other three rows, the selected track's sequencer on the shared timeline (the longest loop), with repeats of shorter loops drawn faded.
 - **Beside the pads:** Note, Velocity, Gate, Pattern Settings on the left; Mixer, FX, Record,
@@ -95,7 +95,7 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Clear / Shift + Clear | Undo the last recording / clear the selected track |
 | Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 |
 | Preset / Shift + Preset | The selected track's next preset (of those switched on) / Presets page on and off |
-| Shift + Patterns | Kits page on and off |
+| Patterns / Shift + Patterns | The selected track's next kit (of those switched on) / Kits page on and off |
 | Octave ▼ ▲ / Shift + Octave ▼ ▲ | Keyboard octave / move the selected track's notes an octave (synth tracks) |
 | Tempo/Swing: tap | Click on/off |
 | Hold Tempo/Swing + turn the master filter knob | Tempo (with Shift held too: swing) |
@@ -150,6 +150,25 @@ project is a folder:
 Saving from the Circuit works once the folder has been allowed in this session (a click on the
 page is needed for that; a Circuit button doesn't count).
 
+## Kits
+
+A kit is 16 samples on the 16 kit pads. It plays exactly like the built-in Drums (same pads, on
+screen and on the Circuit, same GM notes), so a drum part can move from kit to kit.
+
+On the Kits page (Shift + Kits), **＋ New kit** opens the editor: drop audio files (WAV, AIFF,
+MP3, M4A, FLAC) onto pads (several at once fill the empty pads after it), click a pad to hear it,
+drag a pad onto another to swap them, ✕ to clear one, name it and **Save kit**. Click a kit to
+edit it (saving under a new name makes a copy). Each kit's switch says whether **Kits** (tap)
+cycles through it; the switches are saved with the project. Kits are also in the instrument menu.
+
+Five kits come built in: **Rock, Pop, Jazz** (brushes), **Acoustic** and **Percussion**, made
+from free CC0 sample libraries (see `kits/README.md`). Editing a built-in kit and saving it makes
+your own copy.
+
+Your own kits are kept in the projects folder, in `Kits/`, one folder each with its samples copied in
+(`My Kit.zkit/kit.json` and `samples/`), so moving or deleting the original files doesn't matter.
+A project refers to its kits by name.
+
 ## Audio tracks
 
 Choose **Audio** as a track's instrument, then pick any of the computer's audio inputs (an
@@ -167,6 +186,9 @@ Overdubbing on audio tracks isn't there yet.
 - `src/instruments.js`: the synth voice and the drum rack.
 - `src/projects.js`: the projects folder and the project files; `src/session.js`: the current
   project (saving, opening, new) and its screens.
+- `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits
+  page and kit editor.
+- `kits/`: the built-in kits; `tools/build_kits.py` builds them.
 - `src/roll.js`: canvas piano roll (one per track).
 - `src/keys.js`: computer-keyboard note mapping.
 - `src/audioin.js`, `src/capture-worklet.js`: audio inputs, captured continuously so takes can be cut out of them.

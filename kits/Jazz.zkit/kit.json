@@ -1,0 +1,71 @@
+{
+ "format": "zerkit-kit",
+ "version": 1,
+ "name": "Jazz",
+ "pads": [
+  {
+   "file": "01-kick.flac",
+   "label": "Kick"
+  },
+  {
+   "file": "02-brush-snare.flac",
+   "label": "Brush Snare"
+  },
+  {
+   "file": "03-brush-stir.flac",
+   "label": "Brush Stir"
+  },
+  {
+   "file": "04-snare-edge.flac",
+   "label": "Snare Edge"
+  },
+  {
+   "file": "05-closed-hh.flac",
+   "label": "Closed HH"
+  },
+  {
+   "file": "06-foot-hh.flac",
+   "label": "Foot HH"
+  },
+  {
+   "file": "07-open-hh.flac",
+   "label": "Open HH"
+  },
+  {
+   "file": "08-snare-dig.flac",
+   "label": "Snare Dig"
+  },
+  {
+   "file": "09-floor-tom.flac",
+   "label": "Floor Tom"
+  },
+  {
+   "file": "10-low-tom.flac",
+   "label": "Low Tom"
+  },
+  {
+   "file": "11-mid-tom.flac",
+   "label": "Mid Tom"
+  },
+  {
+   "file": "12-high-tom.flac",
+   "label": "High Tom"
+  },
+  {
+   "file": "13-crash.flac",
+   "label": "Crash"
+  },
+  {
+   "file": "14-ride.flac",
+   "label": "Ride"
+  },
+  {
+   "file": "15-splash.flac",
+   "label": "Splash"
+  },
+  {
+   "file": "16-cowbell.flac",
+   "label": "Cowbell"
+  }
+ ]
+}

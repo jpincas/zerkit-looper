@@ -31,6 +31,7 @@ export const supported = () => typeof window.showDirectoryPicker === 'function';
 export class Projects {
   constructor() {
     this.root = null;          // FileSystemDirectoryHandle of the projects folder
+    this.onGranted = null;     // called whenever access to the folder is (newly) allowed
     this.ready = idb('readonly', s => s.get(KEY)).then(h => { this.root = h ?? null; }).catch(() => {});
   }
 
@@ -46,7 +47,7 @@ export class Projects {
   // Call from a click: asks again for a remembered folder, or picks one the first time.
   async allow() {
     await this.ready;
-    if (this.root && (await this.root.requestPermission({ mode: 'readwrite' })) === 'granted') return true;
+    if (this.root && (await this.root.requestPermission({ mode: 'readwrite' })) === 'granted') { this.onGranted?.(); return true; }
     if (!this.root) return this.chooseFolder();
     return false;
   }
@@ -55,6 +56,7 @@ export class Projects {
     const h = await window.showDirectoryPicker({ id: 'zerkit-projects', mode: 'readwrite', startIn: 'music' });
     this.root = h;
     await idb('readwrite', s => s.put(h, KEY));
+    this.onGranted?.();
     return true;
   }
 

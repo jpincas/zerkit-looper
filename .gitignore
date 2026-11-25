@@ -6,3 +6,6 @@ circuit/incoming/
 .venv/
 circuit/build/
 __pycache__/
+
+# Claude Code session worktrees
+.claude/worktrees/

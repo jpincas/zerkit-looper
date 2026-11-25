@@ -1,0 +1,71 @@
+{
+ "format": "zerkit-kit",
+ "version": 1,
+ "name": "Rock",
+ "pads": [
+  {
+   "file": "01-kick.flac",
+   "label": "Kick"
+  },
+  {
+   "file": "02-snare.flac",
+   "label": "Snare"
+  },
+  {
+   "file": "03-clap.flac",
+   "label": "Clap"
+  },
+  {
+   "file": "04-sidestick.flac",
+   "label": "Sidestick"
+  },
+  {
+   "file": "05-closed-hh.flac",
+   "label": "Closed HH"
+  },
+  {
+   "file": "06-pedal-hh.flac",
+   "label": "Pedal HH"
+  },
+  {
+   "file": "07-open-hh.flac",
+   "label": "Open HH"
+  },
+  {
+   "file": "08-rimshot.flac",
+   "label": "Rimshot"
+  },
+  {
+   "file": "09-floor-tom.flac",
+   "label": "Floor Tom"
+  },
+  {
+   "file": "10-tom-18.flac",
+   "label": "Tom 18"
+  },
+  {
+   "file": "11-tom-15.flac",
+   "label": "Tom 15"
+  },
+  {
+   "file": "12-tom-14.flac",
+   "label": "Tom 14"
+  },
+  {
+   "file": "13-crash.flac",
+   "label": "Crash"
+  },
+  {
+   "file": "14-ride.flac",
+   "label": "Ride"
+  },
+  {
+   "file": "15-tambourine.flac",
+   "label": "Tambourine"
+  },
+  {
+   "file": "16-cowbell.flac",
+   "label": "Cowbell"
+  }
+ ]
+}

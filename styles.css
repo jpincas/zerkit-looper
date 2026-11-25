@@ -565,3 +565,40 @@ body.kb-open .keys-area { display: grid; }
 .toast.ok::before { content: "✓  "; color: var(--go); }
 .toast.warn { background: #332a14; border-color: #6b5420; color: var(--accent); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- Kits page: kit cards and the kit editor ---- */
+
+.kit-list .kit-card { cursor: pointer; }
+.kit-card .pc-switch { border: none; padding: 0; cursor: pointer; }
+.kit-card.on .pc-switch { background: color-mix(in srgb, var(--c) 55%, #343a46); }
+.kit-card.on .pc-switch i { transform: translateX(14px); background: #fff; }
+.kit-card:not(.on) .pc-name, .kit-card:not(.on) .swatch { opacity: 0.45; }
+.kit-new { grid-template-columns: auto 1fr; border-style: dashed; color: var(--muted); }
+.kit-new .kn-plus { grid-row: 1 / 3; font-size: 22px; line-height: 1; color: var(--accent); width: 12px; text-align: center; }
+.kit-new:hover .pc-name { color: var(--text); }
+.kit-empty { display: grid; justify-items: start; gap: 12px; color: var(--muted); font-size: 13px; }
+.kit-empty p { margin: 0; }
+
+.kit-edit { display: flex; flex-direction: column; gap: 10px; height: 100%; }
+.ke-head { display: flex; gap: 8px; align-items: center; }
+.ke-head .ke-name { flex: 1; font-size: 16px; padding: 8px 11px; }
+.ke-pads { flex: 1; min-height: 160px; }
+.ke-pad { --kb-color: #8a93a3; overflow: hidden; border-style: dashed; background: var(--pad); }
+.ke-pad.filled { border-style: solid; background: #262b35; cursor: grab; }
+.ke-pad.drop { border-color: var(--accent); box-shadow: 0 0 0 2px #f2b33d55 inset; }
+.ke-pad canvas { position: absolute; inset: 18px 6px 18px; width: calc(100% - 12px); height: calc(100% - 36px); pointer-events: none; }
+.ke-pad .kname { position: absolute; left: 6px; right: 6px; bottom: 5px; font-size: 11px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ke-pad .ke-hint { font-size: 11px; color: #4d5462; }
+.ke-pad.filled .ke-hint { display: none; }
+.ke-clear {
+  position: absolute; top: 3px; right: 4px; width: 18px; height: 18px; padding: 0;
+  border: none; border-radius: 4px; background: #00000055; color: var(--muted); font-size: 11px; cursor: pointer; display: none;
+}
+.ke-pad.filled:hover .ke-clear { display: block; }
+.ke-clear:hover { color: var(--rec); }
+
+/* sample kits in the playing panel: empty pads stay dim */
+.kpad.empty .kname { color: #4d5462; }
+.kit-tag { font-size: 10px; font-weight: 500; color: var(--muted); margin-left: 4px; letter-spacing: 0.04em; }
+.kit-banner { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; font-size: 12px; color: var(--muted); }
+.kit-banner span { flex: 1; }

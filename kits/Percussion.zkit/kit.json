@@ -1,0 +1,71 @@
+{
+ "format": "zerkit-kit",
+ "version": 1,
+ "name": "Percussion",
+ "pads": [
+  {
+   "file": "01-tumba.flac",
+   "label": "Tumba"
+  },
+  {
+   "file": "02-conga.flac",
+   "label": "Conga"
+  },
+  {
+   "file": "03-bongo-low.flac",
+   "label": "Bongo Low"
+  },
+  {
+   "file": "04-bongo-high.flac",
+   "label": "Bongo High"
+  },
+  {
+   "file": "05-cajon.flac",
+   "label": "Cajon"
+  },
+  {
+   "file": "06-timbale.flac",
+   "label": "Timbale"
+  },
+  {
+   "file": "07-shaker.flac",
+   "label": "Shaker"
+  },
+  {
+   "file": "08-tambourine.flac",
+   "label": "Tambourine"
+  },
+  {
+   "file": "09-claves.flac",
+   "label": "Claves"
+  },
+  {
+   "file": "10-woodblock.flac",
+   "label": "Woodblock"
+  },
+  {
+   "file": "11-agogo.flac",
+   "label": "Agogo"
+  },
+  {
+   "file": "12-cowbell.flac",
+   "label": "Cowbell"
+  },
+  {
+   "file": "13-guiro.flac",
+   "label": "Guiro"
+  },
+  {
+   "file": "14-cabasa.flac",
+   "label": "Cabasa"
+  },
+  {
+   "file": "15-triangle.flac",
+   "label": "Triangle"
+  },
+  {
+   "file": "16-darbuka.flac",
+   "label": "Darbuka"
+  }
+ ]
+}
