@@ -21,6 +21,7 @@ Then open http://localhost:8000 in Chrome.
 | `W E` `T Y U` | Black keys |
 | `,` / `.` | Octave down / up for the selected track |
 | `1`–`8` | Select track. The keyboard plays and records into the selected track |
+| `0` | Jam: deselect every track, so keyboards play only themselves over the loop (pick a track to come back) |
 | `Space` | Play / stop |
 | `X` | Record: arm, then close the loop, then toggle overdub |
 | `C` | Metronome click on/off |
@@ -76,7 +77,8 @@ The page is laid out like the Circuit Tracks. Top to bottom:
 - **Pads:** a mute strip and a solo strip, one pad under each track, sharing the first pad row.
   Below them, filling the other three rows, the selected track's sequencer on the shared timeline (the longest loop), with repeats of shorter loops drawn faded. Its header shows the transport: what the looper is doing, the bar.beat and the beat dots.
 - **Beside the pads:** MIDI (the Circuit's Note: tap for the next MIDI instrument, Shift for the
-  MIDI page), Velocity, Gate, Pattern Settings on the left; Audio (the
+  MIDI page), Velocity, Gate (both unused so far) and Jam (the Circuit's Pattern Settings) on the
+  left; Audio (the
   Circuit's Mixer: tap for the next audio instrument, Shift for the Audio page), FX, Record,
   Play on the right.
 

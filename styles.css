@@ -106,7 +106,7 @@ body[data-rec="overdub"] .status { color: var(--accent); }
   --icon-midi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 14'%3E%3Ccircle cx='14' cy='7' r='6.2' fill='none' stroke='black' stroke-width='1.4'/%3E%3Crect x='12.7' y='0.3' width='2.6' height='2.6' fill='black'/%3E%3Ccircle cx='10.40' cy='7.00' r='1'/%3E%3Ccircle cx='11.45' cy='9.55' r='1'/%3E%3Ccircle cx='14.00' cy='10.60' r='1'/%3E%3Ccircle cx='16.55' cy='9.55' r='1'/%3E%3Ccircle cx='17.60' cy='7.00' r='1'/%3E%3C/svg%3E");
   --icon-wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 14'%3E%3Cpath d='M1 7h3l2-5 3 10 3-12 3 12 3-9 2 6 2-3h5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
-.pbtn.note::after, .pbtn.preset::after, .pbtn.kits::after, .pbtn.audio::after, .pbtn.midi::after, .ticon {
+.pbtn.note::after, .pbtn.preset::after, .pbtn.kits::after, .pbtn.audio::after, .pbtn.midi::after, .pbtn.jam::after, .ticon {
   content: "";
   background: currentColor;
   -webkit-mask: var(--icon) center / contain no-repeat;
@@ -117,6 +117,13 @@ body[data-rec="overdub"] .status { color: var(--accent); }
 .pbtn.kits::after, body[data-inst="drums"] .pbtn.note::after { --icon: var(--icon-pads); }
 .pbtn.audio::after { width: 28px; height: 14px; margin-top: 4px; --icon: var(--icon-wave); }
 .pbtn.midi::after { width: 28px; height: 14px; margin-top: 4px; --icon: var(--icon-midi); }
+/* Jam: a pair of quavers */
+.pbtn.jam::after {
+  width: 18px; height: 18px; margin-top: 4px;
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cellipse cx='4' cy='14.2' rx='3.1' ry='2.4' transform='rotate(-20 4 14.2)'/%3E%3Cellipse cx='14' cy='12.2' rx='3.1' ry='2.4' transform='rotate(-20 14 12.2)'/%3E%3Cpath d='M6.3 13.6V3.6L16.3 1.6V11.6' fill='none' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M6.3 3.6L16.3 1.6V4.6L6.3 6.6Z'/%3E%3C/svg%3E");
+}
+.pbtn.jam.on { background: #33261a; border-color: #d08a3a; color: #ffcf96; }
+body.jam .seq-head .inst, body.jam .seq-oct, body.jam .seq-len { visibility: hidden; }   /* no track to set */
 .tbtn[data-type="midi"] .ticon { --icon: var(--icon-midi); }
 body[data-inst="audio"] .pbtn.note::after { display: none; }
 

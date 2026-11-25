@@ -3,7 +3,7 @@
 import { isBlack } from './keys.js';
 import { INSTRUMENTS } from './instruments.js';
 
-const BTN = { preset: 8, note: 9, kits: 13, audio: 14, fx: 15, scales: 18, duplicate: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
+const BTN = { preset: 8, note: 9, jam: 12, kits: 13, audio: 14, fx: 15, scales: 18, duplicate: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
 const TRACK_BTNS = [0, 1, 2, 3, 4, 5, 6, 7];     // Synth 1-2, MIDI 1-2, Drum 1-4 -> tracks 1-8
 const N_LEDS = 69;
 const ledBtn = id => 32 + id;
@@ -125,6 +125,7 @@ export function connectCircuit(app) {
       case BTN.open: return shift ? app.session.newProject() : app.session.open();              // the Projects button
       case BTN.clear: return shift ? actions.redo() : actions.undo();
       case BTN.duplicate: return actions.clearTrack();                                         // Clear track
+      case BTN.jam: return actions.jam();                                                      // the Pattern Settings button
     }
   }
 
@@ -174,7 +175,9 @@ export function connectCircuit(app) {
     const blink = Math.floor(performance.now() / 250) % 2 === 0;
     const instCode = t => codeFor(audio.instruments[t]);
 
-    TRACK_BTNS.forEach(t => (f[ledBtn(t)] = t === sel ? C.white : instCode(t)));
+    const jam = app.jam?.();                                // Jam: no track selected
+    TRACK_BTNS.forEach(t => (f[ledBtn(t)] = t === sel && !jam ? C.white : instCode(t)));
+    f[ledBtn(BTN.jam)] = jam ? C.amber : C.dim;
     f[ledBtn(BTN.quant)] = QUANT_CODE[engine.tracks[sel].quant];
     f[ledBtn(BTN.preset)] = app.page() === 'presets' ? C.white : instCode(sel);
     f[ledBtn(BTN.kits)] = app.page() === 'kits' ? C.white : C.dim;

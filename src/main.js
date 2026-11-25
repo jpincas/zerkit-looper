@@ -70,6 +70,7 @@ const keyFor = (t, note) => {
 };
 
 // ---- actions (shared by keyboard shortcuts and on-screen controls) ------------
+let jam = false;                                   // Jam: no track selected (Jam button)
 
 const actions = {
   play() { audio.resume(); engine.playing ? engine.stop() : engine.start(); },
@@ -91,7 +92,13 @@ const actions = {
     const t = engine.selected;
     octaves[t] = Math.max(0, Math.min(7, octaves[t] + d));
   },
-  select(t) { engine.select(t); },
+  select(t) { jam = false; engine.select(t); },
+  // Jam: no track selected, so keyboards and pads play nothing in the looper and you can play
+  // over the loop (on an instrument that makes its own sound). Picking a track ends it.
+  jam() {
+    jam = !jam;
+    if (jam) for (const src of [...pressed.keys()]) release(src);
+  },
   volume(t, d) { actions.setVolume(t, audio.vol[t] + d); },
   setVolume(t, v) { audio.vol[t] = clamp01(v); audio.mix(); },
   pan(t, d) { audio.setPan(t, audio.pan[t] + d); },
@@ -145,6 +152,12 @@ const actions = {
     if (INSTRUMENTS[name].audio) connectAudioInput(t);
   },
 };
+// While jamming no track is selected, so what works on the selected track does nothing (Record
+// can still close a recording that's under way).
+for (const k of ['record', 'clearTrack', 'transpose', 'octave', 'quant', 'nextInstrument', 'nextKit', 'nextMidi', 'nextAudio']) {
+  const f = actions[k];
+  actions[k] = (...a) => (jam && !(k === 'record' && engine.rec !== 'idle') ? undefined : f(...a));
+}
 
 // ---- the panel (laid out like the Circuit Tracks) ------------------------------------
 
@@ -272,7 +285,8 @@ for (const [row, col, key, def] of [
     title: 'Tap: the selected track\'s next MIDI instrument (of those switched on in the MIDI page). Shift: open the MIDI page, or go back to the Looper' }],
   [6, 1, 'velocity', { tap: 'Velocity' }],
   [7, 1, 'gate', { tap: 'Gate' }],
-  [8, 1, 'patternSettings', { tap: 'Pattern Settings' }],
+  [8, 1, 'jam', { tap: 'Jam', act: () => actions.jam(),
+    title: 'Jam: deselect every track, so your keyboard plays only itself over the loop. Pick a track to come back (0)' }],
   [5, 10, 'audio', { tap: 'Audio', shift: 'List', act: e => (shifted(e) ? actions.togglePage('audio') : actions.nextAudio()),
     title: 'Tap: the selected track\'s next audio instrument (of those switched on in the Audio page). Shift: open the Audio page, or go back to the Looper' }],
   [6, 10, 'fx', { tap: 'FX', shift: 'Bypass', act: e => (shifted(e) ? fxPage.bypass() : actions.togglePage('fx')),
@@ -362,7 +376,7 @@ function rowsFor(t) {
 const pressed = new Map(); // source id -> { track, note }
 
 function press(src, s, vel = 100) {
-  if (pressed.has(src)) return;
+  if (jam || pressed.has(src)) return;
   const track = engine.selected;
   if (isAudio(track)) return;                     // audio tracks record their input, not notes
   const note = noteFor(track, s);
@@ -433,6 +447,7 @@ window.addEventListener('keydown', e => {
   if (e.repeat && !isArrow) return;
   const digit = /^Digit([1-9])$/.exec(e.code);
   if (digit) { actions.select(Number(digit[1]) - 1); e.preventDefault(); return; }
+  if (e.code === 'Digit0') { actions.jam(); e.preventDefault(); return; }
   switch (e.code) {
     case 'Space': actions.play(); break;
     case 'KeyX': actions.record(); break;
@@ -577,6 +592,7 @@ connectMidiKeyboards({
     }
     sustained.delete(src);
     release(src);                                  // same key again: restart it
+    if (jam) return;                               // jamming: the keyboard plays only itself
     const track = engine.selected;
     if (isAudio(track)) return;
     if (isMidi(track) && inst(track).input && inst(track).input !== port) return;   // only its own keyboard plays it
@@ -734,7 +750,7 @@ function frame() {
     const len = engine.tracks[t].loop ? engine.tracks[t].loop.length / bpb : 0;
     const sounding = engine.loopSounding(t).size > 0 || [...pressed.values()].some(p => p.track === t);
     tb.el.style.setProperty('--c', inst(t).color);
-    tb.el.classList.toggle('selected', t === sel);
+    tb.el.classList.toggle('selected', t === sel && !jam);
     tb.el.classList.toggle('rec', t === recTrack);
     tb.el.classList.toggle('empty', !engine.tracks[t].notes.length);
     tb.dot.classList.toggle('on', sounding && audio.audible(t));
@@ -756,7 +772,9 @@ function frame() {
   const view = engine.view(sel);
   const { color } = inst(sel);
   $('seq').style.setProperty('--lane-color', color);
-  setText($('seq-title'), `Track ${sel + 1}`);
+  setText($('seq-title'), jam ? 'Jam' : `Track ${sel + 1}`);
+  btn.jam.classList.toggle('on', jam);
+  document.body.classList.toggle('jam', jam);
   if (instSelect.value !== audio.instruments[sel] && document.activeElement !== instSelect) instSelect.value = audio.instruments[sel];
   const bars = view.length / bpb;
   setText($('seq-len'), bars ? `${bars}-bar loop` : engine.tracks[sel].notes.length ? 'recording…' : 'empty');
@@ -850,6 +868,7 @@ const app = {
   notePanel: () => notePanel,
   session,
   page: () => page,
+  jam: () => jam,
   canTranspose: () => !isDrums(engine.selected) && !isAudio(engine.selected) && engine.tracks[engine.selected].notes.length > 0,
   holding: null,                 // the Circuit button being held for its hold action ('tempo')
   heldNotes: t => [...pressed.values()].filter(p => p.track === t).map(p => p.note),
