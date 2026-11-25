@@ -36,23 +36,22 @@
       <div class="row8 aux" id="aux"></div>
       <div class="row8 tracks" id="trackbar"></div>
 
-      <!-- Pages: the pad area shows the Looper, or the Presets or Kits page (Shift + Preset / Kits) -->
+      <!-- Pages: the pad area shows the Looper, or the Instruments or Kits page (Shift + Instrument / Kits) -->
       <div class="row8 pads mute-row page-looper" id="mute-row"></div>
       <div class="row8 pads solo-row page-looper" id="solo-row"></div>
       <div class="seq page-looper" id="seq">
           <div class="seq-head">
             <div class="seq-title" id="seq-title">Track 1</div>
             <select id="inst" class="inst" aria-label="Instrument for the selected track"></select>
-            <select id="input" class="inst" aria-label="Audio input for the selected track" hidden></select>
             <span id="oct" class="seq-oct" title="Keyboard octave (, .)">C4</span>
             <span id="seq-len" class="seq-len"></span>
           </div>
           <div class="roll-wrap"><canvas id="roll" class="roll"></canvas></div>
         </div>
-      <div class="page page-presets" id="page-presets" hidden>
-        <div class="preset-list" id="preset-list"></div>
-      </div>
+      <div class="page page-presets" id="page-presets" hidden></div>
       <div class="page page-kits" id="page-kits" hidden></div>
+      <div class="page page-audio" id="page-audio" hidden></div>
+      <div class="page page-midi" id="page-midi" hidden></div>
     </section>
 
     <!-- Playing panel (Note): two-octave keyboard on synth tracks, 16-pad kit on drum tracks.

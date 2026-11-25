@@ -11,8 +11,8 @@ export function connectMidiKeyboards({ onNote, onSustain, onStatus }) {
         names.push(port.name);
         port.onmidimessage = ({ data: [s, a, b] }) => {
           const type = s & 0xF0;
-          if (type === 0x90) onNote(a, b);                 // velocity 0 = note-off
-          else if (type === 0x80) onNote(a, 0);
+          if (type === 0x90) onNote(a, b, port.name);      // velocity 0 = note-off
+          else if (type === 0x80) onNote(a, 0, port.name);
           else if (type === 0xB0 && a === 64) onSustain(b >= 64);
         };
       }

@@ -127,12 +127,7 @@ export const INSTRUMENTS = {
     name: 'Bell', color: '#e8c3a0', octave: 5,
     voice: fm({ ratio: 3.5, index: 4, indexTime: 0.8, env: { a: 0.002, d: 1.5, s: 0, r: 1 }, level: 0.2 }),
   },
-  drums: {
-    name: 'Drums', color: '#4cc9b0', drums: true,
-    voice: (...args) => drumVoice(...args),
-  },
-  // Audio: records an audio input (chosen per track) instead of playing notes.
-  audio: { name: 'Audio', color: '#c9d46a', audio: true },
+  // Audio instruments ("audio:<name>", an audio input) are added at run time: see audioinst.js.
 };
 
 // ---- drum kit ---------------------------------------------------------------
@@ -162,71 +157,4 @@ export function makeNoise(ctx) {
   const data = buf.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
   return buf;
-}
-
-export function drumVoice(ctx, dest, note, vel, t, onEnd, noiseBuf) {
-  const out = new GainNode(ctx, { gain: 0.9 * (vel / 127) });
-  out.connect(dest);
-  const sources = [];
-
-  // Pitched body: frequency sweeps f0 -> f1, amplitude decays.
-  const tone = (f0, f1, sweep, decay, level, type = 'sine') => {
-    const o = new OscillatorNode(ctx, { type, frequency: f0 });
-    o.frequency.setValueAtTime(f0, t);
-    o.frequency.exponentialRampToValueAtTime(f1, t + sweep);
-    const g = new GainNode(ctx, { gain: 0 });
-    g.gain.setValueAtTime(level, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + decay);
-    o.connect(g).connect(out);
-    o.start(t);
-    o.stop(t + decay + 0.02);
-    sources.push(o);
-  };
-
-  // Filtered noise burst. `hits` > 1 gives a clap-style flam.
-  const noise = (type, freq, decay, level, Q = 0.7, hits = 1) => {
-    const s = new AudioBufferSourceNode(ctx, { buffer: noiseBuf });
-    const f = new BiquadFilterNode(ctx, { type, frequency: freq, Q });
-    const g = new GainNode(ctx, { gain: 0 });
-    for (let i = 0; i < hits - 1; i++) {
-      g.gain.setValueAtTime(level, t + i * 0.011);
-      g.gain.exponentialRampToValueAtTime(0.05, t + i * 0.011 + 0.009);
-    }
-    const tail = t + (hits - 1) * 0.011;
-    g.gain.setValueAtTime(level, tail);
-    g.gain.exponentialRampToValueAtTime(0.001, tail + decay);
-    s.connect(f).connect(g).connect(out);
-    s.start(t, Math.random() * 0.5);
-    s.stop(tail + decay + 0.02);
-    sources.push(s);
-  };
-
-  const tom = f => tone(f * 1.6, f, 0.08, 0.35, 0.8);
-
-  switch (KIT[kitPad(note)].note) {
-    case 36: tone(150, 42, 0.12, 0.45, 1.0); tone(900, 200, 0.01, 0.02, 0.25, 'triangle'); break; // kick
-    case 37: tone(1700, 1600, 0.01, 0.03, 0.3, 'square'); noise('highpass', 2000, 0.02, 0.25); break; // rim
-    case 38: tone(220, 160, 0.05, 0.12, 0.5, 'triangle'); noise('highpass', 1200, 0.2, 0.55); break; // snare
-    case 39: noise('bandpass', 1400, 0.16, 0.8, 1.2, 3); break; // clap
-    case 40: tone(260, 190, 0.04, 0.08, 0.45, 'triangle'); noise('highpass', 2500, 0.12, 0.5); break; // snare 2
-    case 41: tom(82); break;
-    case 42: noise('highpass', 7500, 0.05, 0.4); break; // closed hat
-    case 43: tom(104); break;
-    case 44: noise('highpass', 7000, 0.09, 0.25); break; // pedal hat
-    case 45: tom(130); break;
-    case 46: noise('highpass', 7000, 0.4, 0.35); break; // open hat
-    case 47: tom(165); break;
-    case 49: noise('highpass', 4500, 1.4, 0.3); noise('bandpass', 7000, 0.6, 0.2, 0.8); break; // crash
-    case 51: tone(5100, 4900, 0.05, 0.9, 0.06, 'square'); noise('bandpass', 8500, 0.7, 0.2, 1.2); break; // ride
-    case 54: noise('highpass', 8500, 0.14, 0.4, 0.7, 2); tone(6500, 6400, 0.01, 0.06, 0.05, 'square'); break; // tambourine
-    case 56: tone(800, 790, 0.01, 0.28, 0.22, 'square'); tone(540, 535, 0.01, 0.28, 0.22, 'square'); break; // cowbell
-  }
-
-  let remaining = sources.length;
-  for (const s of sources) s.onended = () => { if (--remaining === 0) { out.disconnect(); onEnd(); } };
-
-  return {
-    release() {}, // one-shot: note-off does nothing
-    kill(now) { for (const s of sources) s.stop(now); },
-  };
 }

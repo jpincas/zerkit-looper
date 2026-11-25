@@ -34,7 +34,9 @@ function sampleVoice(buffers) {
 
 // Make (or replace) the instrument for a kit: { name, pads: [{ label, buffer } | null], builtIn? }.
 export function registerKit(kit) {
+  const buffers = kit.pads.map(p => p?.buffer ?? null);      // filled in later for kits still loading
   INSTRUMENTS[kitKey(kit.name)] = {
+    buffers,
     name: kit.name,
     color: colorFor(kit.name),
     drums: true,
@@ -42,7 +44,7 @@ export function registerKit(kit) {
     builtIn: !!kit.builtIn,
     padNames: kit.pads.map(p => p?.label ?? ''),
     padShort: kit.pads.map(p => (p ? abbreviate(p.label) : '')),
-    voice: sampleVoice(kit.pads.map(p => p?.buffer ?? null)),
+    voice: sampleVoice(buffers),
   };
 }
 
@@ -72,22 +74,31 @@ export function abbreviate(label) {
 export const labelFor = fileName => fileName.replace(/\.[^.]+$/, '').replace(/^[\d\s._-]+(?=\D)/, '').slice(0, 40) || fileName;
 
 // Built-in kits: shipped with the app in kits/ (see tools/build_kits.py), listed in kits/index.json.
-// Their pads keep the sample bytes, so editing one and saving makes your own copy.
-export async function loadBuiltInKits(ctx, base = 'kits/') {
+// Registered as soon as their kit.json files are in (so tracks can use them from the start); the
+// samples load after that and drop into place (`samples` resolves when they all have). Their pads
+// keep the sample bytes, so editing one and saving makes your own copy.
+export async function registerBuiltInKits(ctx, base = 'kits/') {
   const names = await (await fetch(base + 'index.json')).json();
-  return Promise.all(names.map(async name => {
+  const kits = await Promise.all(names.map(async name => {
     const dir = `${base}${encodeURIComponent(name)}${EXT}/`;
     const json = await (await fetch(dir + 'kit.json')).json();
-    const pads = await Promise.all(json.pads.map(async p => {
-      if (!p) return null;
-      try {
-        const bytes = await (await fetch(dir + 'samples/' + encodeURIComponent(p.file))).arrayBuffer();
-        return { label: p.label, bytes, ext: p.file.split('.').pop(), buffer: await ctx.decodeAudioData(bytes.slice(0)) };
-      } catch { return null; }
-    }));
+    const pads = json.pads.map(p => p && { label: p.label, file: dir + 'samples/' + encodeURIComponent(p.file), ext: p.file.split('.').pop(), buffer: null });
     while (pads.length < PADS) pads.push(null);
-    return { name: json.name ?? name, pads, builtIn: true };
+    const kit = { name: json.name ?? name, pads, builtIn: true };
+    registerKit(kit);
+    return kit;
   }));
+  const samples = Promise.all(kits.map(kit => Promise.all(kit.pads.map(async (p, i) => {
+    if (!p) return;
+    try {
+      p.bytes = await (await fetch(p.file)).arrayBuffer();
+      p.buffer = await ctx.decodeAudioData(p.bytes.slice(0));
+      const def = INSTRUMENTS[kitKey(kit.name)];
+      if (def?.builtIn) def.buffers[i] = p.buffer;
+    } catch { kit.pads[i] = null; }
+    delete p.file;                                           // a URL, not a file in a kit folder
+  }))));
+  return { kits, samples };
 }
 
 export class KitStore {

@@ -25,7 +25,7 @@ Then open http://localhost:8000 in Chrome.
 | `X` | Record: arm, then close the loop, then toggle overdub |
 | `C` | Metronome click on/off |
 | `↑` / `↓` | Tempo ±1 BPM (hold Shift for ±5) |
-| `Z` | Undo the last recording (the latest take or overdub pass, on its own track) |
+| `Z` / `Shift+Z` | Undo the last recording (the latest take or overdub pass, on its own track) / redo it |
 | `Backspace` | Clear the selected track (`Shift+Backspace` clears everything) |
 
 ## How looping works
@@ -53,19 +53,28 @@ The page is laid out like the Circuit Tracks. Top to bottom:
 - **Knobs:** Master volume (everything the looper plays) on the left, a volume knob above each
   track (with Shift: its left-right position, shown on the strip under it), and Internal sounds on the right. The Circuit's master volume and master filter knobs
   turn the two outer ones. Drag up/down or scroll to turn; double-click resets.
-- **Row above the tracks:** Scales | Octave ▼ ▲ (Shift: move the selected track's notes an octave), Q (cycles the selected track's record
+- **Row above the tracks:** Play/Hide (the play controls; the Circuit's Scales button) | Octave ▼ ▲ (Shift: move the selected track's notes an octave), Q (cycles the selected track's record
   quantise; each track button shows its own: Q off, Q 32, Q 16), Tempo (tap: click; hold + filter knob or scroll: tempo;
-  Shift: swing; shows tempo · swing), Undo (Shift: clear the track), Duplicate, Save (Shift: save as), Open (Shift:
+  Shift: swing; shows tempo · swing), Undo (Shift: redo), Clear track, Save (Shift: save as), Open (Shift:
   new project) | Shift (holds for the next press).
-- **Track row:** Preset (tap: the selected track's next preset, of those switched on; Shift: the
-  Presets page) | the eight track buttons | Kits (Shift: the Kits page). Each track button shows its instrument, loop length and activity. Click one,
+- **Track row:** Instrument (tap: the selected track's next melodic instrument, of those switched
+  on; Shift: the Instruments page) | the eight track buttons | Kits (tap: next kit; Shift: the
+  Kits page). A small icon by each track's name shows its type: keyboard (instrument), pads (kit),
+  waveform (audio). Each track button shows its instrument, loop length and activity. Click one,
   press `1`–`8`, or press its Circuit button to select it.
-- **Pages:** the pad area shows the Looper, or another page. Shift + Preset opens **Presets**:
-  every preset with a switch for whether Preset cycles through it (and which tracks use it).
+- **Pages:** the pad area shows the Looper, or another page. Shift + Instrument opens
+  **Instruments**: every melodic instrument with a switch for whether Instrument cycles through it
+  (and which tracks use it). Shift + Audio opens **Audio**, Shift + MIDI opens **MIDI**.
+  Every page shows up to 16 square cards on the top two pad rows, like the Circuit's pads: tap a
+  card (or its pad on the Circuit) to switch it in or out of its button's cycle; ✎ edits kits,
+  audio and MIDI instruments; **＋ New** is underneath. On the Circuit, a card's pad shows the
+  instrument's colour when on, dim when off, white for the selected track's own.
   Shift + Kits (the Circuit's Patterns button) opens **Kits** (see below). The same again goes back.
 - **Pads:** a mute strip and a solo strip, one pad under each track, sharing the first pad row.
   Below them, filling the other three rows, the selected track's sequencer on the shared timeline (the longest loop), with repeats of shorter loops drawn faded.
-- **Beside the pads:** Note, Velocity, Gate, Pattern Settings on the left; Mixer, FX, Record,
+- **Beside the pads:** MIDI (the Circuit's Note: tap for the next MIDI instrument, Shift for the
+  MIDI page), Velocity, Gate, Pattern Settings on the left; Audio (the
+  Circuit's Mixer: tap for the next audio instrument, Shift for the Audio page), FX, Record,
   Play on the right.
 
 Each button shows its actions top to bottom: what Shift does (small grey, marked ⇧), what holding
@@ -73,17 +82,22 @@ it does (small blue, marked with a clock), what a tap does (the main label), the
 key, the Circuit's Shift, or the on-screen Shift) the buttons with a Shift action light up; while
 Tempo is held on the Circuit, its hold action lights up. Greyed-out buttons aren't used yet.
 
-**Show / Hide** (the Circuit's Note button, on screen) opens a playing panel under the looper: a two-octave keyboard on synth tracks, or the
+**Play / Hide** (the Circuit's Scales button; Note mode on the Circuit) opens a playing panel under the looper: a two-octave keyboard on synth tracks, or the
 16-pad kit on drum tracks (pads 1–8 along the bottom, under the eight tracks; 9–16 above). The
 computer keyboard plays the first octave, or the first 12 pads.
 
-Instruments: Synth, Bass, Pluck, Pad, Keys (FM electric piano), Organ, Bell and Drums, all
-synthesised in the browser. Each track remembers its own keyboard octave.
+A track plays one of three kinds of sound:
 
-The drum kit has 16 pads, in playing order: Kick, Snare, Clap, Rim, Closed hat, Pedal hat, Open
-hat, Snare 2 along the bottom; four toms, Crash, Ride, Tambourine, Cowbell above. Each plays its
-General MIDI note, so a part played in from a MIDI drum kit lands on the right sounds; other notes
-fold onto the GM octave from C1.
+- **Instruments** (melodic): Synth, Bass, Pluck, Pad, Keys (FM electric piano), Organ, Bell, all
+  synthesised in the browser. Each track remembers its own keyboard octave.
+- **Kits**: 16 samples on 16 pads (see Kits). Tracks 5-8 start on the Acoustic kit.
+- **Audio**: an audio instrument, i.e. a named audio input (see Audio tracks).
+- **MIDI**: a MIDI instrument, i.e. an external instrument played over MIDI (see MIDI tracks).
+
+Kit pads are in playing order: Kick, Snare, Clap, Rim, Closed hat, Pedal hat, Open hat, Snare 2
+along the bottom; four toms, Crash, Ride, Tambourine, Cowbell above. Each plays its General MIDI
+note, so a part played in from a MIDI drum kit lands on the right sounds; other notes fold onto
+the GM octave from C1.
 
 ## Novation Circuit Tracks
 
@@ -92,15 +106,18 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Circuit | Looper |
 | --- | --- |
 | Play / Record | Play-stop / record (arm, close, overdub) |
-| Clear / Shift + Clear | Undo the last recording / clear the selected track |
+| Clear / Shift + Clear | Undo the last recording / redo it |
+| Duplicate | Clear the selected track |
 | Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 |
-| Preset / Shift + Preset | The selected track's next preset (of those switched on) / Presets page on and off |
+| Preset / Shift + Preset | The selected track's next instrument (of those switched on) / Instruments page on and off |
+| Mixer / Shift + Mixer | The selected track's next audio instrument / Audio page on and off |
 | Patterns / Shift + Patterns | The selected track's next kit (of those switched on) / Kits page on and off |
 | Octave ▼ ▲ / Shift + Octave ▼ ▲ | Keyboard octave / move the selected track's notes an octave (synth tracks) |
 | Tempo/Swing: tap | Click on/off |
 | Hold Tempo/Swing + turn the master filter knob | Tempo (with Shift held too: swing) |
 | Macro knob above each track / with Shift | That track's volume / left-right position |
-| Note | Switch between track view and Note mode |
+| Scales | Switch between track view and Note mode (and the play controls on screen) |
+| Note / Shift + Note | The selected track's next MIDI instrument / MIDI page on and off |
 | 1-16/17-32 | Cycle the selected track's record quantise (its light: red off, amber 32nds, green 16ths) |
 | Save / Shift + Save | Save the project / save as |
 | Projects / Shift + Projects | Open a recent project (on screen) / new project |
@@ -144,7 +161,8 @@ project is a folder:
 
     My Song.zerkit/
       project.json      tempo, swing, tracks (instrument, octave, quantise, volume, pan, mute,
-                        solo, loop, notes), audio inputs by name, the Presets switches
+                        solo, loop, notes), audio instruments with their inputs, which instruments,
+                        kits and audio instruments are switched off
       audio/*.wav       one 32-bit float WAV per recorded take or overdub layer
 
 Saving from the Circuit works once the folder has been allowed in this session (a click on the
@@ -152,8 +170,9 @@ page is needed for that; a Circuit button doesn't count).
 
 ## Kits
 
-A kit is 16 samples on the 16 kit pads. It plays exactly like the built-in Drums (same pads, on
-screen and on the Circuit, same GM notes), so a drum part can move from kit to kit.
+A kit is 16 samples on the 16 kit pads, played the same way on screen and on the Circuit, with
+the same GM notes, so a drum part can move from kit to kit. (The old synthesised Drums is
+retired: projects that used it open with the Acoustic kit.)
 
 On the Kits page (Shift + Kits), **＋ New kit** opens the editor: drop audio files (WAV, AIFF,
 MP3, M4A, FLAC) onto pads (several at once fill the empty pads after it), click a pad to hear it,
@@ -171,19 +190,36 @@ A project refers to its kits by name.
 
 ## Audio tracks
 
-Choose **Audio** as a track's instrument, then pick any of the computer's audio inputs (an
-instrument's USB audio, an interface, a mic). Arm with X: the take starts on the first sound
+An **audio instrument** is a named audio input: "CP88" = the CP88's USB audio. Make them on the
+Audio page (Shift + Audio, the Circuit's Mixer button): **＋ New audio**, a name and an input.
+They're kept on this computer (inputs belong to the machine); projects remember each one's name
+and input, so opening a project elsewhere makes the ones it needs. **Audio** (tap) cycles the
+selected track through the ones switched on; choosing one connects the track to its input.
+
+Arm with X: the take starts on the first sound
 and closes on a bar line like any other, and plays back through the computer's audio output
 with its own loop length, mute, solo, volume and undo. Recordings are shifted back by the
 input's latency so they sit on the beat. Once a track holds audio the tempo is locked.
-Overdubbing on audio tracks isn't there yet.
+Overdubbing (X on a track with a loop) adds a layer, which undo can take off again.
+
+## MIDI tracks
+
+A **MIDI instrument** is an external instrument played over MIDI: a name, an **output** (a MIDI
+port and channel) and optionally an **input** (the keyboard that plays it; any keyboard if not
+set). Make them on the MIDI page (Shift + MIDI, the Circuit's Note button). A MIDI track records
+notes like any other and sends them, live and looped, to its output, timed to line up with the
+browser's audio; mute and solo apply, and the track's volume scales velocity. If the same
+instrument is both input and output, turn its Local Control off so it doesn't sound twice. Like
+audio instruments they're kept on this computer and projects remember their settings.
 
 ## Code layout
 
 - `src/engine.js`: transport, record state machine and lookahead scheduler. It's pure logic
   that talks to an `out` interface, so it can be swapped for MIDI output later.
 - `src/audio.js`: Web Audio implementation of `out`. It routes each track to its instrument and plays the click.
-- `src/instruments.js`: the synth voice and the drum rack.
+- `src/instruments.js`: the synth voices and the kit pad layout; `src/audioinst.js` /
+  `src/midiinst.js`: audio and MIDI instruments and their pages; `src/cards.js`: the square
+  cards every page uses.
 - `src/projects.js`: the projects folder and the project files; `src/session.js`: the current
   project (saving, opening, new) and its screens.
 - `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits

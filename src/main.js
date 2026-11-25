@@ -8,29 +8,43 @@ import { AudioInputs } from './audioin.js';
 import { connectMidiKeyboards } from './midiin.js';
 import { setupSession } from './session.js';
 import { setupKitPage } from './kitpage.js';
+import { registerBuiltInKits } from './kits.js';
+import { setupAudioInstruments } from './audioinst.js';
+import { setupMidiInstruments } from './midiinst.js';
+import { cardPage, tracksUsing } from './cards.js';
+
+const TRACKS = 8;
+const audio = new AudioOut(TRACKS);
+
+// The built-in kits (their samples keep loading in the background).
+let builtInKits = [];
+try { builtInKits = (await registerBuiltInKits(audio.ctx)).kits; } catch (err) { console.warn('built-in kits', err); }
 
 // One per track, laid out like the Circuit's track buttons: Synth 1-2, MIDI 1-2, Drum 1-4.
 // Separate drum tracks let drum parts have their own loop lengths (1-bar kick, 2-bar hats...).
-const DEFAULTS = ['synth', 'bass', 'keys', 'pad', 'drums', 'drums', 'drums', 'drums'];
-const TRACKS = DEFAULTS.length;
-
-const audio = new AudioOut(TRACKS);
+const DEFAULT_KIT = INSTRUMENTS['kit:Acoustic'] ? 'kit:Acoustic' : Object.keys(INSTRUMENTS).find(k => INSTRUMENTS[k].kit) ?? 'pad';
+const DEFAULTS = ['synth', 'bass', 'keys', 'pad', DEFAULT_KIT, DEFAULT_KIT, DEFAULT_KIT, DEFAULT_KIT];
 DEFAULTS.forEach((inst, t) => (audio.instruments[t] = inst));
 const engine = new Engine(audio, TRACKS);
 setInterval(() => engine.tick(), 25);
 
 const $ = id => document.getElementById(id);
 
-// Pages: the pad area shows the Looper, or the Presets or Kits page.
+// Pages: the pad area shows the Looper, or the Instruments or Kits page.
 let page = 'looper';
-// Presets the Preset button cycles through (all to start with). Will be saved per project.
-const presetOn = Object.fromEntries(Object.keys(INSTRUMENTS).map(k => [k, true]));
+// Instruments (melodic) the Instrument button cycles through (all to start with). Saved per project.
+const presetOn = Object.fromEntries(Object.keys(INSTRUMENTS).filter(k => !INSTRUMENTS[k].kit && !INSTRUMENTS[k].audio && !INSTRUMENTS[k].midi).map(k => [k, true]));
+// MIDI instruments the MIDI button cycles through ("midi:<name>" -> on/off). Saved per project.
+const midiOn = {};
+// Audio instruments the Audio button cycles through ("audio:<name>" -> on/off). Saved per project.
+const audioOn = {};
 // Kits the Kits button cycles through ("kit:<name>" -> on/off; kits start on). Saved per project.
 const kitOn = {};
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const inst = t => INSTRUMENTS[audio.instruments[t]];
 const isDrums = t => !!inst(t).drums;
 const isAudio = t => !!inst(t).audio;
+const isMidi = t => !!inst(t).midi;
 
 // ---- keyboard octave (per track) ---------------------------------------------
 
@@ -52,6 +66,7 @@ const actions = {
   play() { audio.resume(); engine.playing ? engine.stop() : engine.start(); },
   record() { audio.resume(); engine.toggleRecord(); },
   undo() { engine.undo(); },
+  redo() { engine.redo(); },
   clearTrack() { engine.clearTrack(engine.selected); },
   clearAll() { engine.clearAll(); },
   click() { engine.click = !engine.click; },
@@ -75,7 +90,8 @@ const actions = {
   mute(t) { audio.mute[t] = !audio.mute[t]; audio.mix(); },
   solo(t) { audio.solo[t] = !audio.solo[t]; audio.mix(); },
   quant() { engine.cycleQuant(engine.selected); },          // the selected track's record quantise
-  // Preset: the selected track's next preset among those switched on in the Presets page.
+  // Instrument: the selected track's next melodic instrument among those switched on in the
+  // Instruments page.
   nextInstrument(dir) {
     const names = Object.keys(INSTRUMENTS), t = engine.selected, n = names.length;
     const i = names.indexOf(audio.instruments[t]);
@@ -96,6 +112,20 @@ const actions = {
   },
   // Pages: Shift + Preset / Kits opens that page, and the same again goes back to the Looper.
   togglePage(name) { page = page === name ? 'looper' : name; },
+  // MIDI: the selected track's next MIDI instrument among those switched on in the MIDI page.
+  nextMidi() {
+    const keys = Object.keys(INSTRUMENTS).filter(k => INSTRUMENTS[k].midi && midiOn[k] !== false).sort((a, b) => a.localeCompare(b));
+    if (!keys.length) return session.toast('No MIDI instruments switched on: Shift + MIDI to make one', 'warn');
+    const t = engine.selected;
+    actions.instrument(t, keys[(keys.indexOf(audio.instruments[t]) + 1) % keys.length]);
+  },
+  // Audio: the selected track's next audio instrument among those switched on in the Audio page.
+  nextAudio() {
+    const keys = Object.keys(INSTRUMENTS).filter(k => INSTRUMENTS[k].audio && audioOn[k] !== false).sort((a, b) => a.localeCompare(b));
+    if (!keys.length) return session.toast('No audio instruments switched on: Shift + Audio to make one', 'warn');
+    const t = engine.selected;
+    actions.instrument(t, keys[(keys.indexOf(audio.instruments[t]) + 1) % keys.length]);
+  },
   // Browser sounds (synths, drums, click) against audio tracks, and the overall output. Both 0-1,
   // remembered in this browser.
   internalLevel(v) { levels.internal = clamp01(v); audio.setSynthLevel(levels.internal); saveLevels(); },
@@ -103,7 +133,7 @@ const actions = {
   instrument(t, name) {
     audio.setInstrument(t, name);
     if (INSTRUMENTS[name].octave != null) octaves[t] = INSTRUMENTS[name].octave;
-    if (INSTRUMENTS[name].audio && !trackInput[t]) chooseDefaultInput(t);
+    if (INSTRUMENTS[name].audio) connectAudioInput(t);
   },
 };
 
@@ -208,7 +238,8 @@ function makeButton(parent, { tap, shift = '', hold = '', shiftHold = false, tit
 // four pad rows. Columns: 1 = left of the tracks, 2-9 = the eight track columns, 10 = right.
 const btn = {};
 for (const [row, col, key, def] of [
-  [3, 1, 'scales', { tap: 'Scales' }],
+  [3, 1, 'note', { tap: 'Play', act: () => actions.toggleNotes(),
+    title: 'Show or hide the play controls under the looper: keyboard (instrument and MIDI tracks) or kit pads (kit tracks). On the Circuit: Note mode' }],
   [3, 2, 'octDown', { tap: 'Octave ▼', shift: 'Track ▼', act: e => (shifted(e) ? actions.transpose(-1) : actions.octave(-1)),
     title: 'Tap: keyboard octave down (,). Shift: move the selected track\'s notes down an octave' }],
   [3, 3, 'octUp', { tap: 'Octave ▲', shift: 'Track ▲', act: e => (shifted(e) ? actions.transpose(1) : actions.octave(1)),
@@ -216,24 +247,26 @@ for (const [row, col, key, def] of [
   [3, 4, 'quant', { tap: 'Q', act: () => actions.quant(), title: 'Record quantise for the selected track: off → 32nds → 16ths (each track button shows its own)' }],
   [3, 5, 'tempo', { tap: 'Click', shift: 'Swing', shiftHold: true, hold: 'Tempo', act: () => actions.click(),
     title: 'Tap: the metronome (C). Hold + turn the master filter knob (or scroll over it): tempo (↑ ↓). Shift + hold + turn (or Shift + scroll): swing' }],
-  [3, 6, 'clear', { tap: 'Undo', shift: 'Clear track', act: e => (shifted(e) ? actions.clearTrack() : actions.undo()),
-    title: 'Tap: undo the last recording (Z). Shift: clear the selected track (⌫)' }],
-  [3, 7, 'duplicate', { tap: 'Duplicate' }],
+  [3, 6, 'clear', { tap: 'Undo', shift: 'Redo', act: e => (shifted(e) ? actions.redo() : actions.undo()),
+    title: 'Tap: undo the last recording (Z). Shift: redo it (⇧Z)' }],
+  [3, 7, 'clearTrack', { tap: 'Clear track', act: () => actions.clearTrack(),
+    title: 'Clear the selected track (⌫)' }],
   [3, 8, 'save', { tap: 'Save', shift: 'Save as', act: e => (shifted(e) ? session.saveAs() : session.save()),
     title: 'Tap: save the project (⌘S; the first time, name it). Shift: save as (⇧⌘S)' }],
   [3, 9, 'open', { tap: 'Open', shift: 'New', act: e => (shifted(e) ? session.newProject() : session.open()),
     title: 'Tap: open a recent project (⌘O). Shift: start a new project' }],
   [3, 10, 'shift', { tap: 'Shift', act: () => (shiftLatch = !shiftLatch), title: 'Shift: hold the Shift key, or click this for the next press' }],
-  [4, 1, 'preset', { tap: 'Preset', shift: 'Presets page', act: e => (shifted(e) ? actions.togglePage('presets') : actions.nextInstrument(1)),
-    title: 'Tap: the selected track\'s next preset (of those switched on in the Presets page). Shift: open the Presets page, or go back to the Looper' }],
-  [4, 10, 'kits', { tap: 'Kits', shift: 'Kits page', act: e => (shifted(e) ? actions.togglePage('kits') : actions.nextKit()),
+  [4, 1, 'preset', { tap: 'Instrument', shift: 'List', act: e => (shifted(e) ? actions.togglePage('presets') : actions.nextInstrument(1)),
+    title: 'Tap: the selected track\'s next instrument (of those switched on in the Instruments page). Shift: open the Instruments page, or go back to the Looper' }],
+  [4, 10, 'kits', { tap: 'Kits', shift: 'List', act: e => (shifted(e) ? actions.togglePage('kits') : actions.nextKit()),
     title: 'Tap: the selected track\'s next kit (of those switched on in the Kits page). Shift: open the Kits page, or go back to the Looper' }],
-  [5, 1, 'note', { tap: 'Show', act: () => actions.toggleNotes(),
-    title: 'Show or hide the keyboard (synth tracks) or kit pads (drum tracks) under the looper' }],
+  [5, 1, 'midi', { tap: 'MIDI', shift: 'List', act: e => (shifted(e) ? actions.togglePage('midi') : actions.nextMidi()),
+    title: 'Tap: the selected track\'s next MIDI instrument (of those switched on in the MIDI page). Shift: open the MIDI page, or go back to the Looper' }],
   [6, 1, 'velocity', { tap: 'Velocity' }],
   [7, 1, 'gate', { tap: 'Gate' }],
   [8, 1, 'patternSettings', { tap: 'Pattern Settings' }],
-  [5, 10, 'mixer', { tap: 'Mixer' }],
+  [5, 10, 'audio', { tap: 'Audio', shift: 'List', act: e => (shifted(e) ? actions.togglePage('audio') : actions.nextAudio()),
+    title: 'Tap: the selected track\'s next audio instrument (of those switched on in the Audio page). Shift: open the Audio page, or go back to the Looper' }],
   [6, 10, 'fx', { tap: 'FX' }],
   [7, 10, 'record', { tap: 'Record', act: () => actions.record(), title: 'Record (X)' }],
   [8, 10, 'play', { tap: 'Play', act: () => actions.play(), title: 'Play / Stop (Space)' }],
@@ -251,7 +284,7 @@ btn.tempo.addEventListener('wheel', e => {
 // Track buttons, then mute and solo pads under each.
 const tbtns = [];
 for (let t = 0; t < TRACKS; t++) {
-  const b = el('button', 'tbtn', `<span class="tnum">${t + 1}</span><i class="tdot"></i><span class="tname"></span><span class="tlen"></span><b class="tq"></b>`);
+  const b = el('button', 'tbtn', `<span class="tnum">${t + 1}</span><i class="tdot"></i><span class="tinst"><i class="ticon"></i><span class="tname"></span></span><span class="tlen"></span><b class="tq"></b>`);
   b.title = `Track ${t + 1} (${t + 1})`;
   b.addEventListener('click', () => actions.select(t));
   $('trackbar').appendChild(b);
@@ -269,12 +302,15 @@ for (let t = 0; t < TRACKS; t++) {
 }
 
 const instSelect = $('inst');
-// The instrument menu: presets, then kits. Rebuilt when kits are added.
+// The instrument menu: instruments, then kits. Rebuilt when kits are added.
 function fillInstruments() {
   const opt = ([k, v]) => `<option value="${k}">${v.name.replace(/</g, '&lt;')}</option>`;
-  const all = Object.entries(INSTRUMENTS), kits = all.filter(([, v]) => v.kit);
-  instSelect.innerHTML = all.filter(([, v]) => !v.kit).map(opt).join('')
-    + (kits.length ? `<optgroup label="Kits">${kits.sort((a, b) => a[0].localeCompare(b[0])).map(opt).join('')}</optgroup>` : '');
+  const all = Object.entries(INSTRUMENTS), sorted = list => list.sort((a, b) => a[0].localeCompare(b[0]));
+  const kits = sorted(all.filter(([, v]) => v.kit)), auds = sorted(all.filter(([, v]) => v.audio)), midis = sorted(all.filter(([, v]) => v.midi));
+  instSelect.innerHTML = `<optgroup label="Instruments">${all.filter(([, v]) => !v.kit && !v.audio && !v.midi).map(opt).join('')}</optgroup>`
+    + (kits.length ? `<optgroup label="Kits">${kits.map(opt).join('')}</optgroup>` : '')
+    + (auds.length ? `<optgroup label="Audio">${auds.map(opt).join('')}</optgroup>` : '')
+    + (midis.length ? `<optgroup label="MIDI">${midis.map(opt).join('')}</optgroup>` : '');
   instSelect.value = audio.instruments[engine.selected];
 }
 fillInstruments();
@@ -391,7 +427,7 @@ window.addEventListener('keydown', e => {
   switch (e.code) {
     case 'Space': actions.play(); break;
     case 'KeyX': actions.record(); break;
-    case 'KeyZ': actions.undo(); break;
+    case 'KeyZ': e.shiftKey ? actions.redo() : actions.undo(); break;
     case 'KeyC': actions.click(); break;
     case 'ArrowUp': actions.tempo(e.shiftKey ? 5 : 1); break;
     case 'ArrowDown': actions.tempo(e.shiftKey ? -5 : -1); break;
@@ -430,6 +466,17 @@ async function useInput(t, deviceId) {
     console.warn('audio input', err);
     trackInput[t] = null;
   }
+}
+
+// An audio track listens to its audio instrument's input, found by name.
+async function connectAudioInput(t) {
+  const label = inst(t).input;
+  let list = inputs.devices.length && inputs.devices[0].label !== 'Audio input' ? inputs.devices : null;
+  try { list ??= await inputs.permit(); } catch { list = []; }
+  const match = label && list.find(d => d.label === label);
+  if (match) return useInput(t, match.deviceId);
+  trackInput[t] = null;
+  session.toast(label ? `“${inst(t).name}”: its input “${label}” isn't connected` : `“${inst(t).name}” has no input: set one in the Audio page`, 'warn');
 }
 
 async function chooseDefaultInput(t) {
@@ -504,25 +551,6 @@ engine.onDubEnd = (t, startBeat, endBeat, pass) => {
   build();
 };
 
-const inputSelect = $('input');
-let inputOptionsKey = '';
-function syncInputSelect(t) {
-  const key = inputs.devices.map(d => d.deviceId + d.label).join('|');
-  if (key !== inputOptionsKey) {
-    inputOptionsKey = key;
-    const named = inputs.devices.length && inputs.devices[0].label !== 'Audio input';
-    inputSelect.innerHTML = (named ? '' : '<option value="">Allow audio input…</option>')
-      + inputs.devices.map(d => `<option value="${d.deviceId}">${d.label}</option>`).join('');
-  }
-  const want = trackInput[t] ?? '';
-  if (inputSelect.value !== want && document.activeElement !== inputSelect) inputSelect.value = want;
-}
-inputSelect.addEventListener('change', async () => {
-  const t = engine.selected;
-  if (!inputSelect.value) { await chooseDefaultInput(t); inputSelect.blur(); return; }
-  await useInput(t, inputSelect.value);
-  inputSelect.blur();
-});
 inputs.list();
 
 // ---- MIDI keyboards ------------------------------------------------------------
@@ -532,7 +560,7 @@ inputs.list();
 let sustain = false;
 const sustained = new Set();                       // keyboard notes let go while the pedal was down
 connectMidiKeyboards({
-  onNote(note, vel) {
+  onNote(note, vel, port) {
     const src = `midi:${note}`;
     if (!vel) {
       if (sustain && pressed.has(src)) sustained.add(src); else release(src);
@@ -542,6 +570,7 @@ connectMidiKeyboards({
     release(src);                                  // same key again: restart it
     const track = engine.selected;
     if (isAudio(track)) return;
+    if (isMidi(track) && inst(track).input && inst(track).input !== port) return;   // only its own keyboard plays it
     pressed.set(src, { track, note });
     engine.noteOn(track, note, vel);
   },
@@ -559,33 +588,45 @@ connectMidiKeyboards({
 
 // ---- pages ----------------------------------------------------------------------
 
-// Presets page: one card per preset, with its switch for cycling and the tracks using it.
-const presetCards = Object.entries(INSTRUMENTS).filter(([, def]) => !def.kit).map(([name, def]) => {
-  const card = el('button', 'preset-card', `<i class="swatch"></i><span class="pc-name">${def.name}</span>`
-    + `<span class="pc-use"></span><span class="pc-switch"><i></i></span>`);
-  card.style.setProperty('--c', def.color);
-  card.title = `${def.name}: click to switch it in or out of Preset's cycle`;
-  card.addEventListener('click', () => actions.togglePreset(name));
-  $('preset-list').appendChild(card);
-  return { name, card, use: card.querySelector('.pc-use') };
+// Instruments page: a card per melodic instrument (tap: in or out of Instrument's cycle).
+const instrumentCards = cardPage($('page-presets'), {
+  items: () => Object.keys(presetOn).map(key => ({ key, name: INSTRUMENTS[key].name, color: INSTRUMENTS[key].color })),
+  isOn: key => presetOn[key],
+  current: key => audio.instruments[engine.selected] === key,
+  toggle: key => actions.togglePreset(key),
+  usedBy: key => tracksUsing(audio.instruments, key),
 });
+instrumentCards.draw();
+
+// The open page's cards, for the Circuit's pads (null on the Looper, or while editing).
+function pageCards() {
+  switch (page) {
+    case 'presets': return instrumentCards;
+    case 'kits': return kitPage.editing() ? null : kitPage.cards;
+    case 'audio': return audioPage.editing() ? null : audioPage.cards;
+    case 'midi': return midiPage.editing() ? null : midiPage.cards;
+  }
+  return null;
+}
 
 function drawPage() {
   document.body.dataset.page = page;
   btn.preset.classList.toggle('page-on', page === 'presets');
   btn.kits.classList.toggle('page-on', page === 'kits');
+  btn.audio.classList.toggle('page-on', page === 'audio');
+  btn.midi.classList.toggle('page-on', page === 'midi');
+  const midiShown = !$('page-midi').hidden;
+  $('page-midi').hidden = page !== 'midi';
+  if (page === 'midi') { if (!midiShown) midiPage.show(); midiPage.update(); }
+  const audioShown = !$('page-audio').hidden;
+  $('page-audio').hidden = page !== 'audio';
+  if (page === 'audio') { if (!audioShown) audioPage.show(); audioPage.update(); }
   for (const id of ['mute-row', 'solo-row', 'seq']) $(id).hidden = page !== 'looper';
   $('page-presets').hidden = page !== 'presets';
   const kitsShown = !$('page-kits').hidden;
   $('page-kits').hidden = page !== 'kits';
   if (page === 'kits') { if (!kitsShown) kitPage.show(); kitPage.update(); }
-  if (page !== 'presets') return;
-  for (const { name, card, use } of presetCards) {
-    card.classList.toggle('on', presetOn[name]);
-    card.classList.toggle('current', audio.instruments[engine.selected] === name);
-    const tracks = audio.instruments.map((n, t) => (n === name ? t + 1 : 0)).filter(Boolean);
-    setText(use, tracks.length ? `Track${tracks.length > 1 ? 's' : ''} ${tracks.join(', ')}` : 'Not in use');
-  }
+  if (page === 'presets') instrumentCards.update();
 }
 
 // ---- render loop ------------------------------------------------------------
@@ -633,7 +674,8 @@ function frame() {
   btn.tempo.classList.toggle('on', engine.click);
   btn.tempo.classList.toggle('beat', engine.click && engine.playing && b >= 0 && b % 1 < 0.15);
   setText(btn.tempo.querySelector('.pval'), `${engine.bpm} · ${engine.swing}%`);
-  btn.clear.classList.toggle('on', !engine.isEmpty());
+  btn.clear.classList.toggle('on', !engine.isEmpty() || engine.canRedo());
+  btn.clearTrack.classList.toggle('on', engine.tracks[sel].notes.length + engine.tracks[sel].clips.length > 0);
   btn.shift.classList.toggle('on', shiftDown());
   document.body.classList.toggle('shift', shiftDown());
   btn.tempo.classList.toggle('holding', app.holding === 'tempo');        // held on the Circuit
@@ -663,6 +705,7 @@ function frame() {
     tb.m.classList.toggle('on', audio.mute[t]);
     tb.s.classList.toggle('on', audio.solo[t]);
     setText(tb.name, inst(t).name);
+    tb.el.dataset.type = isAudio(t) ? 'audio' : isMidi(t) ? 'midi' : isDrums(t) ? 'kit' : 'inst';    // picks the icon by the name
     tb.q.dataset.q = engine.tracks[t].quant;
     setText(tb.q, { off: 'Q off', mid: 'Q 32', strong: 'Q 16' }[engine.tracks[t].quant]);
     setText(tb.len, len ? `${len} bar${len > 1 ? 's' : ''}` : '—');
@@ -678,16 +721,16 @@ function frame() {
   setText($('seq-len'), bars ? `${bars}-bar loop` : engine.tracks[sel].notes.length ? 'recording…' : 'empty');
   setText($('pos'), engine.playing ? `${Math.floor(view.head / bpb) + 1}.${Math.floor(view.head % bpb) + 1}` : '1.1');
   drawRoll($('roll'), view, bpb, isAudio(sel) ? AUDIO_ROWS : rowsFor(sel), color);
-  $('input').hidden = !isAudio(sel);
-  syncInputSelect(sel);
 
   // Playing panel: keyboard or kit for the selected track; colour and lights follow it
   document.body.dataset.inst = drums ? 'drums' : isAudio(sel) ? 'audio' : 'pitched';   // also picks the Note button's picture
   document.body.style.setProperty('--kb-color', inst(sel).color);
   document.body.classList.toggle('kb-open', notePanel);
   btn.note.classList.toggle('page-on', notePanel);
-  setText(btn.note.querySelector('.plabel'), notePanel ? 'Hide' : 'Show');
-  setText($('oct'), drums || isAudio(sel) ? '' : `Octave C${octaves[sel]}`);
+  setText(btn.note.querySelector('.plabel'), notePanel ? 'Hide' : 'Play');
+  setText($('oct'), isAudio(sel) ? `Input: ${inst(sel).input ?? 'none'}`
+    : isMidi(sel) ? `Out: ${inst(sel).output ?? 'none'} · ch ${inst(sel).channel} · Octave C${octaves[sel]}`
+    : drums ? '' : `Octave C${octaves[sel]}`);
   if (notePanel) {
     $('keyboard').hidden = drums || isAudio(sel);
     $('kit').hidden = !drums;
@@ -727,10 +770,28 @@ setInterval(() => {
 }, 100);
 // ---- projects --------------------------------------------------------------------
 const session = setupSession({
-  engine, audio, actions, octaves, trackInput, presetOn, kitOn, makeClip, inputs, useInput, chooseDefaultInput, DEFAULTS, INSTRUMENTS,
+  engine, audio, actions, octaves, presetOn, kitOn, audioOn, midiOn, makeClip, DEFAULTS, DEFAULT_KIT, INSTRUMENTS,
+  ensureAudio: (name, input) => audioPage.ensure(name, input),
+  ensureMidi: (name, settings) => midiPage.ensure(name, settings),
   beforeRestore: () => kitPage.refresh(),
 });
-const kitPage = setupKitPage({ root: $('page-kits'), audio, engine, kitOn, session, onKitsChanged: fillInstruments });
+const audioPage = setupAudioInstruments({
+  root: $('page-audio'), audio, engine, inputs, audioOn, session,
+  onChanged(change) {
+    fillInstruments();
+    if (change?.renamed) audio.instruments.forEach((n, t) => { if (n === change.renamed[0]) audio.instruments[t] = change.renamed[1]; });
+    if (change?.key) audio.instruments.forEach((n, t) => { if (n === change.key) connectAudioInput(t); });   // its input may have changed
+  },
+});
+const midiPage = setupMidiInstruments({
+  root: $('page-midi'), audio, engine, midiOn, session,
+  onChanged(change) {
+    fillInstruments();
+    if (change?.renamed) audio.instruments.forEach((n, t) => { if (n === change.renamed[0]) audio.instruments[t] = change.renamed[1]; });
+  },
+});
+fillInstruments();                       // now with this computer's audio and MIDI instruments
+const kitPage = setupKitPage({ root: $('page-kits'), audio, engine, kitOn, session, onKitsChanged: fillInstruments, builtInKits });
 // The project's name in the status strip (• = unsaved changes); Save lights up when there are some.
 setInterval(() => {
   const dirty = session.dirty();
@@ -740,7 +801,7 @@ setInterval(() => {
 }, 300);
 
 const app = {
-  engine, audio, actions, press, release, noteFor, isDrums, soundBlocked, levels, kitPad,
+  engine, audio, actions, press, release, noteFor, isDrums, isAudio, isMidi, soundBlocked, levels, kitPad, pageCards,
   circuitShift: false,
   notePanel: () => notePanel,
   session,

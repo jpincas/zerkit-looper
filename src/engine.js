@@ -62,6 +62,7 @@ export class Engine {
     this.selected = 0;
     this.swing = 50;        // % of an 8th where its second 16th falls: 50 = straight, 75 = full shuffle
     this.pass = 0;          // recording pass number, stamped on each note (for undo)
+    this.redoStack = [];    // undone passes, newest last: [{ pass, tracks: [{ i, notes, clips, loop }] }]
     this.held = new Map();  // "track:note" -> recorded note still waiting for its note-off
   }
 
@@ -175,6 +176,7 @@ export class Engine {
     switch (this.rec) {
       case 'idle':
         this.pass++;
+        this.redoStack = [];                            // a new recording: what was undone is gone
         this.recTrack = this.selected;
         this.rec = this.tracks[this.recTrack].loop ? 'overdub' : 'armed';
         this.dubStart = this.beat();
@@ -259,6 +261,7 @@ export class Engine {
 
   clearAll() {
     for (const t of this.tracks) { t.notes = []; t.clips = []; t.loop = null; }
+    this.redoStack = [];
     this.held.clear();
     this.rec = 'idle';
     this.resync();
@@ -266,6 +269,7 @@ export class Engine {
 
   clearTrack(i) {
     const recordingHere = this.rec !== 'idle' && this.recTrack === i;
+    this.redoStack = [];
     this.tracks[i].notes = [];
     this.tracks[i].clips = [];
     this.tracks[i].loop = null;
@@ -291,16 +295,36 @@ export class Engine {
     let last = -1;
     if (this.rec === 'overdub') { last = this.pass; this.rec = 'idle'; }
     else for (const t of this.tracks) for (const n of [...t.notes, ...t.clips]) last = Math.max(last, n.pass);
-    if (last >= 0) this.removePass(last);
+    if (last >= 0) this.removePass(last, true);
     this.resync();
   }
 
-  removePass(p) {
-    for (const t of this.tracks) {
+  // Redo: put back the most recently undone pass (its notes, audio, and the loop length if the
+  // undo had emptied the track). Only when not recording.
+  redo() {
+    if (this.rec !== 'idle' || !this.redoStack.length) return;
+    const { tracks } = this.redoStack.pop();
+    for (const { i, notes, clips, loop } of tracks) {
+      const t = this.tracks[i];
+      t.notes.push(...notes);
+      t.clips.push(...clips);
+      if (!t.loop && loop) t.loop = { ...loop, playFrom: 0 };
+    }
+    this.resync();
+  }
+  canRedo() { return this.rec === 'idle' && this.redoStack.length > 0; }
+
+  // Remove a pass everywhere. `keep`: remember it for redo.
+  removePass(p, keep = false) {
+    const saved = [];
+    this.tracks.forEach((t, i) => {
+      const notes = t.notes.filter(n => n.pass === p && n.dur != null), clips = t.clips.filter(c => c.pass === p);
+      if (keep && (notes.length || clips.length)) saved.push({ i, notes, clips, loop: t.loop && { ...t.loop } });
       t.notes = t.notes.filter(n => n.pass !== p);
       t.clips = t.clips.filter(c => c.pass !== p);
       if (t.notes.length === 0 && t.clips.length === 0) t.loop = null;
-    }
+    });
+    if (saved.length) this.redoStack.push({ pass: p, tracks: saved });
     this.dropHeld(n => n.pass === p);
   }
 

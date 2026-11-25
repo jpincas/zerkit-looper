@@ -6,7 +6,7 @@ import { Projects, supported } from './projects.js';
 const FORMAT = 'zerkit-project', VERSION = 1;
 
 export function setupSession(ctx) {
-  const { engine, audio, actions, octaves, trackInput, presetOn, kitOn, makeClip, inputs, useInput, chooseDefaultInput, DEFAULTS, INSTRUMENTS } = ctx;
+  const { engine, audio, actions, octaves, presetOn, kitOn, audioOn, midiOn, makeClip, DEFAULTS, DEFAULT_KIT, INSTRUMENTS } = ctx;
   const store = new Projects();
   let name = null;             // the current project's name (null: never saved)
   let savedKey = null;         // what it looked like when last saved or opened, to tell if it's changed
@@ -24,8 +24,12 @@ export function setupSession(ctx) {
         loop: tr.loop ? { origin: tr.loop.origin, length: tr.loop.length } : null,
         notes: tr.notes.filter(n => n.dur != null).map(({ note, vel, start, dur, pass, kind }) => ({ note, vel, start, dur, pass, kind })),
       };
+      if (INSTRUMENTS[instrument].midi) {                         // so another computer can make it
+        const { output, channel, input } = INSTRUMENTS[instrument];
+        out.midi = { output, channel, input };
+      }
       if (INSTRUMENTS[instrument].audio) {
-        out.input = inputs.devices.find(d => d.deviceId === trackInput[t])?.label ?? null;
+        out.input = INSTRUMENTS[instrument].input ?? null;      // so another computer can make it
         out.clips = tr.clips.map(c => {
           const file = `audio/${c.id}.wav`;
           const buf = c.complete();
@@ -41,6 +45,8 @@ export function setupSession(ctx) {
       nextPass: engine.pass,
       presetsOn: { ...presetOn },
       kitsOff: Object.keys(kitOn).filter(k => kitOn[k] === false).sort(),   // kits start on, so only the off ones
+      audiosOff: Object.keys(audioOn).filter(k => audioOn[k] === false).sort(),
+      midisOff: Object.keys(midiOn).filter(k => midiOn[k] === false).sort(),
       tracks,
     };
     return { json, audioFiles };
@@ -69,11 +75,21 @@ export function setupSession(ctx) {
     engine.setTempo(json.tempo);
     engine.setSwing(json.swing ?? 50);
     engine.click = json.click ?? true;
-    Object.assign(presetOn, json.presetsOn ?? {});
+    for (const [k, on] of Object.entries(json.presetsOn ?? {})) if (k in presetOn) presetOn[k] = on;
     for (const k of Object.keys(kitOn)) kitOn[k] = !(json.kitsOff ?? []).includes(k);
+    for (const k of Object.keys(audioOn)) audioOn[k] = !(json.audiosOff ?? []).includes(k);
+    for (const k of Object.keys(midiOn)) midiOn[k] = !(json.midisOff ?? []).includes(k);
     const lost = new Set();
     json.tracks.forEach((t, i) => {
-      if (!INSTRUMENTS[t.instrument]) { lost.add(t.instrument.replace(/^kit:/, '')); t.instrument = 'drums'; }   // a kit that's gone
+      // An instrument that's gone: the retired synthesised Drums quietly becomes the default kit;
+      // a missing kit does too, with a warning.
+      if (t.instrument === 'drums') t.instrument = DEFAULT_KIT;
+      // Audio: the project's audio instrument, made here if this computer hasn't got it (the old
+      // generic "Audio" becomes one named after its input).
+      if (t.instrument === 'audio') t.instrument = ctx.ensureAudio(t.input ?? 'Audio input', t.input);
+      else if (t.instrument.startsWith('audio:') && !INSTRUMENTS[t.instrument]) ctx.ensureAudio(t.instrument.slice(6), t.input);
+      else if (t.instrument.startsWith('midi:') && !INSTRUMENTS[t.instrument]) ctx.ensureMidi(t.instrument.slice(5), t.midi);
+      if (!INSTRUMENTS[t.instrument]) { lost.add(t.instrument.replace(/^kit:/, '')); t.instrument = DEFAULT_KIT; }
       actions.instrument(i, t.instrument);
       octaves[i] = t.octave ?? octaves[i];
       const tr = engine.tracks[i];
@@ -85,18 +101,10 @@ export function setupSession(ctx) {
       audio.mute[i] = !!t.mute;
       audio.solo[i] = !!t.solo;
       audio.setPan(i, t.pan ?? 0);
-      if (INSTRUMENTS[t.instrument].audio) reconnectInput(i, t.input);
     });
     audio.mix();
-    if (lost.size) setTimeout(() => toast(`Kit${lost.size > 1 ? 's' : ''} not found: ${[...lost].join(', ')} (using Drums)`, 'warn'), 1400);
+    if (lost.size) setTimeout(() => toast(`Kit${lost.size > 1 ? 's' : ''} not found: ${[...lost].join(', ')} (using ${INSTRUMENTS[DEFAULT_KIT].name})`, 'warn'), 1400);
     engine.pass = json.nextPass ?? 1 + Math.max(0, ...json.tracks.flatMap(t => [...(t.notes ?? []), ...(t.clips ?? [])].map(n => n.pass)));
-  }
-
-  // Audio inputs are found again by name (their ids differ between browsers and sessions).
-  async function reconnectInput(t, label) {
-    const list = await inputs.list();
-    const match = label && list.find(d => d.label === label);
-    if (match) useInput(t, match.deviceId); else chooseDefaultInput(t);
   }
 
   function reset() {
@@ -106,6 +114,8 @@ export function setupSession(ctx) {
     engine.setSwing(50);
     for (const k of Object.keys(presetOn)) presetOn[k] = true;
     for (const k of Object.keys(kitOn)) kitOn[k] = true;
+    for (const k of Object.keys(audioOn)) audioOn[k] = true;
+    for (const k of Object.keys(midiOn)) midiOn[k] = true;
     DEFAULTS.forEach((inst, i) => {
       actions.instrument(i, inst);
       engine.tracks[i].quant = 'off';

@@ -2,11 +2,12 @@
 // editor: 16 pads laid out as on the Circuit (1-8 along the bottom). Drop audio files onto pads,
 // click a pad to hear it, drag one pad onto another to swap them, ✕ to clear, then save it named.
 import { INSTRUMENTS, KIT } from './instruments.js';
-import { KitStore, PADS, registerKit, kitKey, labelFor, loadBuiltInKits } from './kits.js';
+import { KitStore, PADS, registerKit, kitKey, labelFor } from './kits.js';
+import { cardPage, tracksUsing } from './cards.js';
 
 const AUDIO_FILE = /\.(wav|wave|aif|aiff|mp3|m4a|aac|flac|ogg|opus|caf)$/i;
 
-export function setupKitPage({ root, audio, engine, kitOn, session, onKitsChanged }) {
+export function setupKitPage({ root, audio, engine, kitOn, session, onKitsChanged, builtInKits }) {
   const store = new KitStore(session.store);
   let draft = null;        // the kit being edited: { name, from, pads: [{ label, buffer, file?, bytes?, ext? } | null] }
   let dirty = false;
@@ -16,15 +17,11 @@ export function setupKitPage({ root, audio, engine, kitOn, session, onKitsChange
 
   // Built-in kits (shipped with the app): always there, no folder needed.
   const builtIn = {};
-  const builtInReady = loadBuiltInKits(audio.ctx).then(kits => {
-    for (const kit of kits) {
-      builtIn[kit.name] = kit;
-      if (!INSTRUMENTS[kitKey(kit.name)]) registerKit(kit);      // your own kit of the same name wins
-      kitOn[kitKey(kit.name)] ??= true;
-    }
-    onKitsChanged();
-    if (!draft) drawList();
-  }).catch(err => console.warn('built-in kits', err));
+  for (const kit of builtInKits) {
+    builtIn[kit.name] = kit;
+    kitOn[kitKey(kit.name)] ??= true;
+  }
+  const builtInReady = Promise.resolve();
 
   // Load every kit in the folder as an instrument. Kits keep their switch; new ones start on.
   let loading = null;
@@ -46,47 +43,29 @@ export function setupKitPage({ root, audio, engine, kitOn, session, onKitsChange
 
   const kitKeys = () => Object.keys(INSTRUMENTS).filter(k => INSTRUMENTS[k].kit).sort((a, b) => a.localeCompare(b));
 
+  // The kit cards. Your own kits live in the projects folder: without access, a note says so.
+  let access = 'granted';
+  const cards = cardPage(root, {
+    items: () => kitKeys().map(key => ({ key, name: INSTRUMENTS[key].name, color: INSTRUMENTS[key].color })),
+    isOn: key => kitOn[key] !== false,
+    current: key => audio.instruments[engine.selected] === key,
+    toggle: key => { kitOn[key] = kitOn[key] === false; },
+    usedBy: key => tracksUsing(audio.instruments, key) || (INSTRUMENTS[key].builtIn ? 'built-in' : ''),
+    onEdit: key => edit(INSTRUMENTS[key].name),
+    onNew: () => edit(null),
+    newLabel: 'New kit',
+    footer: () => (access === 'granted' ? '' : `<span class="cards-note">${access === 'none' ? 'Your own kits are kept in your projects folder.' : `Allow access to your projects folder, “${esc(session.store.folderName)}”, to see your own kits.`}</span>
+      <button class="dlg-btn" data-act="allow">${access === 'none' ? 'Choose folder…' : 'Allow'}</button>`),
+    wireFoot: foot => foot.querySelector('[data-act=allow]')?.addEventListener('click', async () => { try { if (await session.store.allow()) refresh(); } catch {} }),
+  });
   async function drawList() {
-    const state = await session.store.access();
-    // Your own kits live in the projects folder: without access, say so above the built-in ones.
-    const banner = state === 'granted' ? '' : `<div class="kit-banner">
-        <span>${state === 'none' ? 'Your own kits are kept in your projects folder.' : `Allow access to your projects folder, “${esc(session.store.folderName)}”, to see your own kits.`}</span>
-        <button class="dlg-btn" data-act="allow">${state === 'none' ? 'Choose folder…' : 'Allow'}</button></div>`;
-    root.innerHTML = `${banner}<div class="preset-list kit-list"></div>`;
-    root.querySelector('[data-act=allow]')?.addEventListener('click', async () => { try { if (await session.store.allow()) refresh(); } catch {} });
-    const list = root.querySelector('.kit-list');
-    const add = document.createElement('button');
-    add.className = 'preset-card kit-new';
-    add.innerHTML = '<span class="kn-plus">＋</span><span class="pc-name">New kit</span>';
-    add.onclick = () => edit(null);
-    list.appendChild(add);
-    for (const key of kitKeys()) {
-      const def = INSTRUMENTS[key];
-      const card = document.createElement('div');
-      card.className = 'preset-card kit-card';
-      card.style.setProperty('--c', def.color);
-      card.innerHTML = `<i class="swatch"></i><span class="pc-name">${esc(def.name)}${def.builtIn ? ' <small class="kit-tag">built-in</small>' : ''}</span><span class="pc-use"></span>`
-        + `<button class="pc-switch" title="Switch it in or out of Kits' cycle"><i></i></button>`;
-      card.title = `${def.name}: click to edit`;
-      card.onclick = e => { if (!e.target.closest('.pc-switch')) edit(def.name); };
-      card.querySelector('.pc-switch').onclick = () => { kitOn[key] = !kitOn[key]; };
-      card.dataset.key = key;
-      list.appendChild(card);
-    }
+    draft = null;
+    access = await session.store.access();
+    cards.draw();
   }
-
-  // Kept up to date while the list is showing: switches and which tracks use each kit.
   function update() {
     if (draft) return drawPads();
-    for (const card of root.querySelectorAll('.kit-card')) {
-      const key = card.dataset.key;
-      card.classList.toggle('on', kitOn[key] !== false);
-      card.classList.toggle('current', audio.instruments[engine.selected] === key);
-      const tracks = audio.instruments.map((n, t) => (n === key ? t + 1 : 0)).filter(Boolean);
-      const use = card.querySelector('.pc-use');
-      const text = tracks.length ? `Track${tracks.length > 1 ? 's' : ''} ${tracks.join(', ')}` : 'Not in use';
-      if (use.textContent !== text) use.textContent = text;
-    }
+    cards.update();
   }
 
   // ---- the editor ----------------------------------------------------------------------
@@ -257,5 +236,5 @@ export function setupKitPage({ root, audio, engine, kitOn, session, onKitsChange
   session.store.onGranted = () => refresh();
   refresh();
   drawList();
-  return { refresh, update, show: () => (draft ? null : drawList()), editing: () => !!draft };
+  return { refresh, update, show: () => (draft ? null : drawList()), editing: () => !!draft, cards };
 }

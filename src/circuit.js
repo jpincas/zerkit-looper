@@ -1,8 +1,9 @@
 // Novation Circuit Tracks (patched LOOP04 firmware) as the looper's control surface.
 // Protocol: docs/circuit-protocol.md. Inputs arrive on channel 15; lights go out as SysEx F0 7D.
 import { isBlack } from './keys.js';
+import { INSTRUMENTS } from './instruments.js';
 
-const BTN = { preset: 8, note: 9, kits: 13, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
+const BTN = { preset: 8, note: 9, kits: 13, audio: 14, scales: 18, duplicate: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
 const TRACK_BTNS = [0, 1, 2, 3, 4, 5, 6, 7];     // Synth 1-2, MIDI 1-2, Drum 1-4 -> tracks 1-8
 const N_LEDS = 69;
 const ledBtn = id => 32 + id;
@@ -14,7 +15,10 @@ const C = { off: 0, white: 0x01, dim: 0x02, red: 0x53, dimRed: 0x54, green: 0x17
 // separately (LOOP05: F0 7D 03 60 b0..b8 F7, 127 = full, 0-126 = 10%-98%); LOOP04 ignores it.
 const brightFor = vol => Math.round(127 * vol * vol);      // follows the track's gain (vol squared)
 const QUANT_CODE = { off: C.red, mid: C.amber, strong: C.green };
-const INST_CODE = { synth: 0x2B, bass: 0x45, pluck: 0x13, pad: 0x49, keys: 0x17, organ: 0x32, bell: 0x6A, drums: 0x4D,
+const KIT_CODE = 0x4D;                           // any kit (teal)
+const AUDIO_CODE = 0x2D;                         // any audio instrument (yellow)
+const MIDI_CODE = 0x09;                          // any MIDI instrument (blue)
+const INST_CODE = { synth: 0x2B, bass: 0x45, pluck: 0x13, pad: 0x49, keys: 0x17, organ: 0x32, bell: 0x6A,
   audio: 0x2D };
 
 // Pads are numbered 0-31, row by row from the top-left, so column = track.
@@ -32,6 +36,12 @@ function noteModeSemitone(p) {
   const row = p >> 3, col = p & 7;
   const s = row % 2 ? WHITE[col] : BLACK[col];
   return s == null ? null : s + (row < 2 ? 12 : 0);
+}
+
+// The light colour for an instrument key.
+function codeFor(key) {
+  const def = INSTRUMENTS[key];
+  return INST_CODE[key] ?? (def?.kit ? KIT_CODE : def?.audio ? AUDIO_CODE : def?.midi ? MIDI_CODE : C.white);
 }
 
 export function connectCircuit(app) {
@@ -57,6 +67,8 @@ export function connectCircuit(app) {
 
   function padDown(p, vel) {
     audio.resume();
+    const cards = app.pageCards();                     // a page is open: pads 1-16 are its cards
+    if (cards) { if (p < 16) cards.toggleAt(p); return; }
     if (isNoteMode()) {
       const s = app.isDrums(engine.selected) ? kitPadAt(p) : noteModeSemitone(p);
       if (s != null) return app.press(`circuit${p}`, s, Math.max(1, vel));
@@ -71,18 +83,21 @@ export function connectCircuit(app) {
     if (id === BTN.shift) { shift = app.circuitShift = true; return; }
     if (TRACK_BTNS.includes(id)) return actions.select(id);
     switch (id) {
-      case BTN.note: return actions.toggleNotes();
+      case BTN.scales: return actions.toggleNotes();                                           // Note mode (Show/Hide)
+      case BTN.note: return shift ? actions.togglePage('midi') : actions.nextMidi();            // MIDI instruments
       case BTN.quant: return actions.quant();             // 1-16/17-32: the selected track's record quantise
       case BTN.play: return actions.play();
       case BTN.record: return actions.record();
       case BTN.octDown: return shift ? actions.transpose(-1) : actions.octave(-1);   // Shift: move the track's notes
       case BTN.octUp: return shift ? actions.transpose(1) : actions.octave(1);
       case BTN.tempo: tempoHeld = true; tempoTurned = false; app.holding = 'tempo'; return;
-      case BTN.preset: return shift ? actions.togglePage('presets') : actions.nextInstrument(1);   // Shift: Presets page
+      case BTN.preset: return shift ? actions.togglePage('presets') : actions.nextInstrument(1);   // Shift: Instruments page
       case BTN.kits: return shift ? actions.togglePage('kits') : actions.nextKit();            // the Patterns button
+      case BTN.audio: return shift ? actions.togglePage('audio') : actions.nextAudio();        // the Mixer button
       case BTN.save: return shift ? app.session.saveAs() : app.session.save();
       case BTN.open: return shift ? app.session.newProject() : app.session.open();              // the Projects button
-      case BTN.clear: return shift ? actions.clearTrack() : actions.undo();
+      case BTN.clear: return shift ? actions.redo() : actions.undo();
+      case BTN.duplicate: return actions.clearTrack();                                         // Clear track
     }
   }
 
@@ -120,25 +135,28 @@ export function connectCircuit(app) {
     const sel = engine.selected;
     const b = engine.beat();
     const blink = Math.floor(performance.now() / 250) % 2 === 0;
-    const instCode = t => INST_CODE[audio.instruments[t]] ?? C.white;
+    const instCode = t => codeFor(audio.instruments[t]);
 
     TRACK_BTNS.forEach(t => (f[ledBtn(t)] = t === sel ? C.white : instCode(t)));
     f[ledBtn(BTN.quant)] = QUANT_CODE[engine.tracks[sel].quant];
     f[ledBtn(BTN.preset)] = app.page() === 'presets' ? C.white : instCode(sel);
     f[ledBtn(BTN.kits)] = app.page() === 'kits' ? C.white : C.dim;
+    f[ledBtn(BTN.audio)] = app.page() === 'audio' ? C.white : C.dim;
     f[ledBtn(BTN.save)] = projectDirty ? C.white : C.dim;                 // white: unsaved changes
     f[ledBtn(BTN.open)] = C.dim;
-    f[ledBtn(BTN.note)] = isNoteMode() ? C.white : C.dim;
+    f[ledBtn(BTN.scales)] = isNoteMode() ? C.white : C.dim;
+    f[ledBtn(BTN.note)] = app.page() === 'midi' ? C.white : C.dim;
     f[ledBtn(BTN.play)] = app.soundBlocked?.() ? (blink ? C.red : C.off)     // sound blocked: click the page
       : engine.playing ? C.green : C.dim;
     f[ledBtn(BTN.record)] = {
-      idle: engine.tracks[sel].loop ? C.dimRed : C.off,
+      idle: engine.tracks[sel].loop ? C.dim : C.off,          // dim: the track has a loop (Record would overdub)
       armed: blink ? C.red : C.off,
       recording: C.red,
       closing: blink ? C.red : C.dimRed,
       overdub: C.amber,
     }[engine.rec];
-    f[ledBtn(BTN.clear)] = !engine.isEmpty() ? C.white : C.off;      // something to undo
+    f[ledBtn(BTN.clear)] = (shift ? engine.canRedo() : !engine.isEmpty()) ? C.white : C.off;   // something to undo / redo
+    f[ledBtn(BTN.duplicate)] = engine.tracks[sel].notes.length + engine.tracks[sel].clips.length ? C.white : C.off;   // something to clear
     const onBeat = engine.playing && b >= 0 && b % 1 < 0.15;
     f[ledBtn(BTN.tempo)] = tempoHeld ? C.white : engine.click ? (onBeat ? C.white : C.dim) : C.off;
     f[ledBtn(BTN.octDown)] = f[ledBtn(BTN.octUp)] = (shift ? app.canTranspose() : !app.isDrums(sel)) ? C.white : C.off;
@@ -151,7 +169,9 @@ export function connectCircuit(app) {
     }
     f[KNOB_LED + 8] = tempoHeld ? (shift ? C.amber : C.white) : C.off;
 
-    if (isNoteMode() && app.isDrums(sel)) kitLights(f, sel, instCode);
+    const cards = app.pageCards();
+    if (cards) pageLights(f, cards);
+    else if (isNoteMode() && app.isDrums(sel)) kitLights(f, sel, instCode);
     else if (isNoteMode()) noteLights(f, sel, instCode);
     else trackLights(f, sel, instCode);
     return f;
@@ -174,6 +194,12 @@ export function connectCircuit(app) {
       const i = Math.min(15, Math.floor((view.head - base) / stepLen));
       f[STEP_ROW + i] = view.recording ? C.red : C.white;
     }
+  }
+
+  // A page's cards on pads 1-16: the instrument's colour when switched on, dim when off, white
+  // for the selected track's own.
+  function pageLights(f, cards) {
+    cards.state().forEach((c, i) => { f[i] = c.current ? C.white : c.on ? codeFor(c.key) : C.dim; });
   }
 
   function mixLights(f) {
