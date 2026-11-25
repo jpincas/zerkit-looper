@@ -1,0 +1,354 @@
+{
+ "format": "zerkit-instrument",
+ "version": 1,
+ "name": "Harp",
+ "color": "#c7b7f0",
+ "octave": 3,
+ "release": 1.2,
+ "zones": [
+  {
+   "file": "1-031.flac",
+   "root": 31,
+   "lo": 0,
+   "hi": 33,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-035.flac",
+   "root": 35,
+   "lo": 34,
+   "hi": 36,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-038.flac",
+   "root": 38,
+   "lo": 37,
+   "hi": 39,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-041.flac",
+   "root": 41,
+   "lo": 40,
+   "hi": 43,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-045.flac",
+   "root": 45,
+   "lo": 44,
+   "hi": 46,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-048.flac",
+   "root": 48,
+   "lo": 47,
+   "hi": 50,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-052.flac",
+   "root": 52,
+   "lo": 51,
+   "hi": 53,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-055.flac",
+   "root": 55,
+   "lo": 54,
+   "hi": 57,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-059.flac",
+   "root": 59,
+   "lo": 58,
+   "hi": 60,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-062.flac",
+   "root": 62,
+   "lo": 61,
+   "hi": 63,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-065.flac",
+   "root": 65,
+   "lo": 64,
+   "hi": 67,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-069.flac",
+   "root": 69,
+   "lo": 68,
+   "hi": 70,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-072.flac",
+   "root": 72,
+   "lo": 71,
+   "hi": 74,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-076.flac",
+   "root": 76,
+   "lo": 75,
+   "hi": 77,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-079.flac",
+   "root": 79,
+   "lo": 78,
+   "hi": 81,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-083.flac",
+   "root": 83,
+   "lo": 82,
+   "hi": 84,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-086.flac",
+   "root": 86,
+   "lo": 85,
+   "hi": 87,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-089.flac",
+   "root": 89,
+   "lo": 88,
+   "hi": 91,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-093.flac",
+   "root": 93,
+   "lo": 92,
+   "hi": 95,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-098.flac",
+   "root": 98,
+   "lo": 96,
+   "hi": 99,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-101.flac",
+   "root": 101,
+   "lo": 100,
+   "hi": 127,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "2-028.flac",
+   "root": 28,
+   "lo": 0,
+   "hi": 29,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-031.flac",
+   "root": 31,
+   "lo": 30,
+   "hi": 33,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-035.flac",
+   "root": 35,
+   "lo": 34,
+   "hi": 36,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-038.flac",
+   "root": 38,
+   "lo": 37,
+   "hi": 39,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-041.flac",
+   "root": 41,
+   "lo": 40,
+   "hi": 43,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-045.flac",
+   "root": 45,
+   "lo": 44,
+   "hi": 46,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-048.flac",
+   "root": 48,
+   "lo": 47,
+   "hi": 50,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-052.flac",
+   "root": 52,
+   "lo": 51,
+   "hi": 53,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-055.flac",
+   "root": 55,
+   "lo": 54,
+   "hi": 57,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-059.flac",
+   "root": 59,
+   "lo": 58,
+   "hi": 60,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-062.flac",
+   "root": 62,
+   "lo": 61,
+   "hi": 63,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-065.flac",
+   "root": 65,
+   "lo": 64,
+   "hi": 67,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-069.flac",
+   "root": 69,
+   "lo": 68,
+   "hi": 70,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-072.flac",
+   "root": 72,
+   "lo": 71,
+   "hi": 74,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-076.flac",
+   "root": 76,
+   "lo": 75,
+   "hi": 77,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-079.flac",
+   "root": 79,
+   "lo": 78,
+   "hi": 81,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-083.flac",
+   "root": 83,
+   "lo": 82,
+   "hi": 84,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-086.flac",
+   "root": 86,
+   "lo": 85,
+   "hi": 87,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-089.flac",
+   "root": 89,
+   "lo": 88,
+   "hi": 91,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-093.flac",
+   "root": 93,
+   "lo": 92,
+   "hi": 95,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-098.flac",
+   "root": 98,
+   "lo": 96,
+   "hi": 99,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-101.flac",
+   "root": 101,
+   "lo": 100,
+   "hi": 127,
+   "velLo": 64,
+   "velHi": 127
+  }
+ ]
+}

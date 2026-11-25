@@ -1,0 +1,186 @@
+{
+ "format": "zerkit-instrument",
+ "version": 1,
+ "name": "Vibraphone",
+ "color": "#7fc4e0",
+ "octave": 4,
+ "release": 0.9,
+ "zones": [
+  {
+   "file": "1-053.flac",
+   "root": 53,
+   "lo": 0,
+   "hi": 55,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-057.flac",
+   "root": 57,
+   "lo": 56,
+   "hi": 58,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-060.flac",
+   "root": 60,
+   "lo": 59,
+   "hi": 62,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-064.flac",
+   "root": 64,
+   "lo": 63,
+   "hi": 65,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-067.flac",
+   "root": 67,
+   "lo": 66,
+   "hi": 69,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-071.flac",
+   "root": 71,
+   "lo": 70,
+   "hi": 72,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-074.flac",
+   "root": 74,
+   "lo": 73,
+   "hi": 75,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-077.flac",
+   "root": 77,
+   "lo": 76,
+   "hi": 79,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-081.flac",
+   "root": 81,
+   "lo": 80,
+   "hi": 82,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-084.flac",
+   "root": 84,
+   "lo": 83,
+   "hi": 86,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "1-088.flac",
+   "root": 88,
+   "lo": 87,
+   "hi": 127,
+   "velLo": 1,
+   "velHi": 63
+  },
+  {
+   "file": "2-053.flac",
+   "root": 53,
+   "lo": 0,
+   "hi": 55,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-057.flac",
+   "root": 57,
+   "lo": 56,
+   "hi": 58,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-060.flac",
+   "root": 60,
+   "lo": 59,
+   "hi": 62,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-064.flac",
+   "root": 64,
+   "lo": 63,
+   "hi": 65,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-067.flac",
+   "root": 67,
+   "lo": 66,
+   "hi": 69,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-071.flac",
+   "root": 71,
+   "lo": 70,
+   "hi": 72,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-074.flac",
+   "root": 74,
+   "lo": 73,
+   "hi": 75,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-077.flac",
+   "root": 77,
+   "lo": 76,
+   "hi": 79,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-081.flac",
+   "root": 81,
+   "lo": 80,
+   "hi": 82,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-084.flac",
+   "root": 84,
+   "lo": 83,
+   "hi": 86,
+   "velLo": 64,
+   "velHi": 127
+  },
+  {
+   "file": "2-088.flac",
+   "root": 88,
+   "lo": 87,
+   "hi": 127,
+   "velLo": 64,
+   "velHi": 127
+  }
+ ]
+}

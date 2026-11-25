@@ -709,3 +709,20 @@ body.kb-open .keys-area { display: grid; }
 }
 .pedal-switch:active { transform: translateY(2px); box-shadow: 0 1px 0 #0b0d11; }
 .pedal .pk { --c: inherit; }                        /* knob arcs in the pedal's colour */
+
+/* ---- instrument maker: source, the 8 settings (Circuit knobs 1-8), the sampled notes ---- */
+.inst-edit { display: flex; flex-direction: column; gap: 10px; }
+.ie-source { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.ie-source .inst { min-width: 0; max-width: 200px; color: var(--text); font-size: 13px; padding: 6px 8px; }
+.ie-run { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
+.ie-knobs { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; }
+.ie-knobs .pk { --c: var(--accent); }
+.ie-zones { display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; min-height: 40px; overflow: auto; flex: 1; }
+.ie-zone {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 8px; border: 1px solid #3a4150; border-radius: 6px;
+  background: var(--panel-2); font: 12px ui-monospace, Menlo, monospace; color: var(--text); cursor: pointer;
+}
+.ie-zone:hover { border-color: var(--accent); }
+.ie-zone small { color: var(--muted); }
+.ie-x { font-weight: 400; color: var(--muted); padding: 0 3px; }
+.ie-x:hover { color: var(--rec); }

@@ -9,6 +9,8 @@ import { connectMidiKeyboards } from './midiin.js';
 import { setupSession } from './session.js';
 import { setupKitPage } from './kitpage.js';
 import { registerBuiltInKits } from './kits.js';
+import { registerBuiltInInstruments } from './sampler.js';
+import { setupInstrumentPage } from './instpage.js';
 import { setupAudioInstruments } from './audioinst.js';
 import { setupMidiInstruments } from './midiinst.js';
 import { cardPage, tracksUsing } from './cards.js';
@@ -21,12 +23,17 @@ const audio = new AudioOut(TRACKS);
 // The built-in kits (their samples keep loading in the background).
 let builtInKits = [];
 try { builtInKits = (await registerBuiltInKits(audio.ctx)).kits; } catch (err) { console.warn('built-in kits', err); }
+// The built-in sampled instruments (their samples load when first used).
+try { await registerBuiltInInstruments(audio.ctx); } catch (err) { console.warn('built-in instruments', err); }
 
 // One per track, laid out like the Circuit's track buttons: Synth 1-2, MIDI 1-2, Drum 1-4.
 // Separate drum tracks let drum parts have their own loop lengths (1-bar kick, 2-bar hats...).
-const DEFAULT_KIT = INSTRUMENTS['kit:Acoustic'] ? 'kit:Acoustic' : Object.keys(INSTRUMENTS).find(k => INSTRUMENTS[k].kit) ?? 'pad';
-const DEFAULTS = ['synth', 'bass', 'keys', 'pad', DEFAULT_KIT, DEFAULT_KIT, DEFAULT_KIT, DEFAULT_KIT];
-DEFAULTS.forEach((inst, t) => (audio.instruments[t] = inst));
+const DEFAULT_KIT = INSTRUMENTS['kit:Acoustic'] ? 'kit:Acoustic' : Object.keys(INSTRUMENTS).find(k => INSTRUMENTS[k].kit);
+// Melodic tracks start on built-in sampled instruments (or the first there is, if one's missing).
+const FIRST_INSTRUMENT = Object.keys(INSTRUMENTS).find(k => INSTRUMENTS[k].sampled);
+const have = key => (INSTRUMENTS[key] ? key : FIRST_INSTRUMENT);
+const DEFAULTS = [have('smp:Grand Piano'), have('smp:Upright Bass'), have('smp:Vibraphone'), have('smp:Cello'), DEFAULT_KIT, DEFAULT_KIT, DEFAULT_KIT, DEFAULT_KIT];
+DEFAULTS.forEach((inst, t) => { audio.instruments[t] = inst; INSTRUMENTS[inst]?.load?.(); });
 const engine = new Engine(audio, TRACKS);
 setInterval(() => engine.tick(), 25);
 
@@ -52,7 +59,7 @@ const isMidi = t => !!inst(t).midi;
 
 const octaves = DEFAULTS.map(name => INSTRUMENTS[name].octave ?? 4);
 const baseNote = t => (octaves[t] + 1) * 12; // octave 4 -> C4 = 60
-// What key `s` plays on track t: on synth tracks the s-th semitone of the two-octave keyboard
+// What key `s` plays on track t: on instrument and MIDI tracks the s-th semitone of the two-octave keyboard
 // (0-23, from the track's octave); on drum tracks kit pad s (0-15).
 const noteFor = (t, s) => (isDrums(t) ? KIT[s % KIT.length].note : baseNote(t) + s);
 // The key (keyboard semitone or kit pad) that shows `note` on track t, or -1
@@ -74,7 +81,7 @@ const actions = {
   click() { engine.click = !engine.click; },
   tempo(d) { engine.setTempo(engine.bpm + d); },
   swing(d) { engine.setSwing(engine.swing + d); },
-  // Shift + Octave: move the selected track's recorded notes by an octave (synth tracks only:
+  // Shift + Octave: move the selected track's recorded notes by an octave (instrument and MIDI tracks:
   // drums map every octave onto the same pads, and audio would need a pitch-shifter).
   transpose(d) {
     const t = engine.selected;
@@ -128,12 +135,12 @@ const actions = {
     const t = engine.selected;
     actions.instrument(t, keys[(keys.indexOf(audio.instruments[t]) + 1) % keys.length]);
   },
-  // Browser sounds (synths, drums, click) against audio tracks, and the overall output. Both 0-1,
-  // remembered in this browser.
-  internalLevel(v) { levels.internal = clamp01(v); audio.setSynthLevel(levels.internal); saveLevels(); },
+  // The click's level and the overall output. Both 0-1, remembered in this browser.
+  clickLevel(v) { levels.click = clamp01(v); audio.setClickLevel(levels.click); saveLevels(); },
   masterVolume(v) { levels.master = clamp01(v); audio.setMasterVolume(levels.master); saveLevels(); },
   instrument(t, name) {
     audio.setInstrument(t, name);
+    INSTRUMENTS[name].load?.();                           // a sampled instrument's samples
     if (INSTRUMENTS[name].octave != null) octaves[t] = INSTRUMENTS[name].octave;
     if (INSTRUMENTS[name].audio) connectAudioInput(t);
   },
@@ -141,14 +148,13 @@ const actions = {
 
 // ---- the panel (laid out like the Circuit Tracks) ------------------------------------
 
-const levels = { internal: 0.4, master: 0.8 };
+const levels = { click: 0.5, master: 0.8 };
 try {
   const saved = JSON.parse(localStorage.getItem('levels') ?? 'null');
-  if (saved) Object.assign(levels, saved);
-  else if (localStorage.getItem('synthLevel') != null) levels.internal = Number(localStorage.getItem('synthLevel')) / 100;
+  if (saved) { levels.master = saved.master ?? levels.master; levels.click = saved.click ?? levels.click; }
 } catch {}
 function saveLevels() { try { localStorage.setItem('levels', JSON.stringify(levels)); } catch {} }
-audio.setSynthLevel(levels.internal);
+audio.setClickLevel(levels.click);
 audio.setMasterVolume(levels.master);
 
 // Shift: the Shift key, the Circuit's Shift, or the on-screen Shift button (which holds for the
@@ -208,9 +214,9 @@ const masterKnob = makeKnob($('master-vol'), {
   label: 'Master', title: 'Master volume: everything the looper plays. The Circuit\'s master volume knob turns it. Drag or scroll; double-click to reset.',
   get: () => levels.master, set: actions.masterVolume, dflt: 0.8,
 });
-const internalKnob = makeKnob($('master-int'), {
-  label: 'Internal sounds', title: 'Level of the built-in sounds (synths, drums, click) against audio tracks. The Circuit\'s master filter knob turns it.',
-  get: () => levels.internal, set: actions.internalLevel, dflt: 0.4,
+const clickKnob = makeKnob($('master-int'), {
+  label: 'Click', title: 'The metronome click\'s level. The Circuit\'s master filter knob turns it. Drag or scroll; double-click to reset.',
+  get: () => levels.click, set: actions.clickLevel, dflt: 0.5,
 });
 const volKnobs = [];
 for (let t = 0; t < TRACKS; t++) {
@@ -370,7 +376,7 @@ function release(src) {
   engine.noteOff(p.track, p.note);
 }
 
-// The playing panel under the looper (Note): a two-octave keyboard on synth tracks, the 16-pad
+// The playing panel under the looper (Note): a two-octave keyboard on instrument and MIDI tracks, the 16-pad
 // kit on drum tracks. The computer keyboard plays its first octave / first 12 pads.
 let notePanel = false;
 const playable = (el, s) => {
@@ -596,19 +602,11 @@ connectMidiKeyboards({
 const fxPage = setupFxPage({ root: $('page-fx'), audio, engine, trackName: t => inst(t).name,
   shiftHeld: () => shiftDown(), consumeShift: () => { shiftLatch = false; } });
 
-const instrumentCards = cardPage($('page-presets'), {
-  items: () => Object.keys(presetOn).map(key => ({ key, name: INSTRUMENTS[key].name, color: INSTRUMENTS[key].color })),
-  isOn: key => presetOn[key],
-  current: key => audio.instruments[engine.selected] === key,
-  toggle: key => actions.togglePreset(key),
-  usedBy: key => tracksUsing(audio.instruments, key),
-});
-instrumentCards.draw();
 
 // The open page's cards, for the Circuit's pads (null on the Looper, or while editing).
 function pageCards() {
   switch (page) {
-    case 'presets': return instrumentCards;
+    case 'presets': return instPage.editing() ? null : instPage.cards;
     case 'kits': return kitPage.editing() ? null : kitPage.cards;
     case 'audio': return audioPage.editing() ? null : audioPage.cards;
     case 'midi': return midiPage.editing() ? null : midiPage.cards;
@@ -637,7 +635,9 @@ function drawPage() {
   const kitsShown = !$('page-kits').hidden;
   $('page-kits').hidden = page !== 'kits';
   if (page === 'kits') { if (!kitsShown) kitPage.show(); kitPage.update(); }
-  if (page === 'presets') instrumentCards.update();
+  const instShown = $('page-presets').dataset.shown === '1';
+  $('page-presets').dataset.shown = page === 'presets' ? '1' : '';
+  if (page === 'presets') { if (!instShown) instPage.show(); instPage.update(); }
 }
 
 // ---- render loop ------------------------------------------------------------
@@ -692,7 +692,7 @@ function frame() {
   document.body.classList.toggle('shift', shiftDown());
   btn.tempo.classList.toggle('holding', app.holding === 'tempo');        // held on the Circuit
   const drums = isDrums(sel);
-  // With Shift down they transpose the track instead, which needs recorded notes on a synth track.
+  // With Shift down they transpose the track instead, which needs recorded notes on an instrument or MIDI track.
   const canMove = app.canTranspose();
   btn.octUp.disabled = shiftDown() ? !canMove : drums || octaves[sel] >= 7;
   btn.octDown.disabled = shiftDown() ? !canMove : drums || octaves[sel] <= 0;
@@ -700,7 +700,7 @@ function frame() {
 
   // Knobs
   masterKnob.update();
-  internalKnob.update();
+  clickKnob.update();
   volKnobs.forEach((k, t) => k.update(inst(t).color));
 
   // Track buttons
@@ -789,7 +789,7 @@ const session = setupSession({
   engine, audio, actions, octaves, presetOn, kitOn, audioOn, midiOn, makeClip, DEFAULTS, DEFAULT_KIT, INSTRUMENTS,
   ensureAudio: (name, input) => audioPage.ensure(name, input),
   ensureMidi: (name, settings) => midiPage.ensure(name, settings),
-  beforeRestore: () => kitPage.refresh(),
+  beforeRestore: () => Promise.all([kitPage.refresh(), instPage.refresh()]),
 });
 const audioPage = setupAudioInstruments({
   root: $('page-audio'), audio, engine, inputs, audioOn, session,
@@ -807,7 +807,10 @@ const midiPage = setupMidiInstruments({
   },
 });
 fillInstruments();                       // now with this computer's audio and MIDI instruments
+const instPage = setupInstrumentPage({ root: $('page-presets'), audio, engine, presetOn, session, inputs, onChanged: () => fillInstruments() });
 const kitPage = setupKitPage({ root: $('page-kits'), audio, engine, kitOn, session, onKitsChanged: fillInstruments, builtInKits });
+session.store.onGranted = () => { kitPage.refresh(); instPage.refresh(); };   // folder allowed: your kits and instruments
+instPage.refresh();
 // The project's name in the status strip (• = unsaved changes); Save lights up when there are some.
 setInterval(() => {
   const dirty = session.dirty();
@@ -821,6 +824,7 @@ const app = {
   fxNudge: (k, d) => fxPage.nudge(k, d),
   fxBypass: () => fxPage.bypass(),
   fxCodes: () => fxPage.codes(),
+  pageControls: () => (page === 'presets' ? instPage.controls() : null),   // the instrument maker
   fxValues: () => fxPage.values(),
   circuitShift: false,
   notePanel: () => notePanel,

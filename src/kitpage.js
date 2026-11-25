@@ -233,7 +233,6 @@ export function setupKitPage({ root, audio, engine, kitOn, session, onKitsChange
   root.addEventListener('dragover', e => e.preventDefault());
   root.addEventListener('drop', e => e.preventDefault());
 
-  session.store.onGranted = () => refresh();
   refresh();
   drawList();
   return { refresh, update, show: () => (draft ? null : drawList()), editing: () => !!draft, cards };

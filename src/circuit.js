@@ -18,8 +18,10 @@ const QUANT_CODE = { off: C.red, mid: C.amber, strong: C.green };
 const KIT_CODE = 0x4D;                           // any kit (teal)
 const AUDIO_CODE = 0x2D;                         // any audio instrument (yellow)
 const MIDI_CODE = 0x09;                          // any MIDI instrument (blue)
-const INST_CODE = { synth: 0x2B, bass: 0x45, pluck: 0x13, pad: 0x49, keys: 0x17, organ: 0x32, bell: 0x6A,
-  audio: 0x2D };
+const INST_CODE = {                             // the built-in sampled instruments
+  'smp:Grand Piano': 0x2B, 'smp:Upright Bass': 0x45, 'smp:Cello': 0x53, 'smp:Vibraphone': 0x13, 'smp:Harp': 0x49,
+};
+const OWN_CODE = 0x17;                           // your own sampled instruments (green)
 
 // Pads are numbered 0-31, row by row from the top-left, so column = track.
 //   Track view: row 1 = mute (pads 0-7), row 2 = solo (8-15), rows 3-4 = 16-step view of the bar.
@@ -41,7 +43,7 @@ function noteModeSemitone(p) {
 // The light colour for an instrument key.
 function codeFor(key) {
   const def = INSTRUMENTS[key];
-  return INST_CODE[key] ?? (def?.kit ? KIT_CODE : def?.audio ? AUDIO_CODE : def?.midi ? MIDI_CODE : C.white);
+  return INST_CODE[key] ?? (def?.kit ? KIT_CODE : def?.audio ? AUDIO_CODE : def?.midi ? MIDI_CODE : def?.sampled ? OWN_CODE : C.white);
 }
 
 export function connectCircuit(app) {
@@ -102,6 +104,8 @@ export function connectCircuit(app) {
 
   function buttonDown(id) {
     audio.resume();
+    const controls = app.pageControls?.();
+    if (controls && (id === BTN.play || id === BTN.record) && controls.button(id === BTN.play ? 'play' : 'record')) return;
     if (id === BTN.shift) { shift = app.circuitShift = true; return; }
     if (TRACK_BTNS.includes(id)) return actions.select(id);
     switch (id) {
@@ -134,6 +138,8 @@ export function connectCircuit(app) {
   }
 
   function knob(k, delta) {
+    const controls = app.pageControls?.();               // e.g. the instrument maker's settings
+    if (controls) return controls.knob(k, delta);
     if (app.page() === 'fx') return app.fxNudge(k, delta);   // FX page: the 8 pedal controls
     if (shift) return actions.pan(k, delta * 0.03);  // Shift: that track's left-right position
     actions.volume(k, delta * 0.02);                 // knob above each track = its volume
@@ -141,7 +147,7 @@ export function connectCircuit(app) {
 
   // The master filter knob is the general-purpose knob: what it turns depends on what's held.
   // It reports a position, so it's used as turns (the change since its last report): that way
-  // changing the tempo doesn't make Internal sounds jump the next time it's turned on its own.
+  // changing the tempo doesn't make the click level jump the next time it's turned on its own.
   function filterKnob(pos) {
     const first = lastFilter == null, d = first ? 0 : pos - lastFilter;
     lastFilter = pos;
@@ -149,8 +155,8 @@ export function connectCircuit(app) {
       if (d) { shift ? actions.swing(d) : actions.tempo(d); tempoTurned = true; }
       return;
     }
-    if (first || pos === 0 || pos === 127) return actions.internalLevel(pos / 127);   // first report, end stops: exact
-    if (d) actions.internalLevel(app.levels.internal + d / 127);
+    if (first || pos === 0 || pos === 127) return actions.clickLevel(pos / 127);   // first report, end stops: exact
+    if (d) actions.clickLevel(app.levels.click + d / 127);
   }
 
   // ---- lights ----------------------------------------------------------------
@@ -197,7 +203,8 @@ export function connectCircuit(app) {
     // Knobs: the track's colour (brightness = volume, sent separately). The filter knob lights
     // while Tempo is held, when it sets the tempo (white) or, with Shift, the swing (amber).
     for (let t = 0; t < 8; t++) {
-      f[KNOB_LED + t] = app.page() === 'fx' ? app.fxCodes()[t]                // FX page: each pedal's colour
+      f[KNOB_LED + t] = app.pageControls?.() ? app.pageControls().codes()[t]     // a page's own settings
+        : app.page() === 'fx' ? app.fxCodes()[t]                // FX page: each pedal's colour
         : audio.vol[t] > 0 ? instCode(t) : C.off;
     }
     f[KNOB_LED + 8] = tempoHeld ? (shift ? C.amber : C.white) : C.off;
@@ -270,7 +277,9 @@ export function connectCircuit(app) {
 
   function sendBrightness() {
     if (!out) return;
-    const b = app.page() === 'fx'
+    const controls = app.pageControls?.();
+    const b = controls ? [...controls.values(), 127]
+      : app.page() === 'fx'
       ? [...app.fxValues().map(v => Math.round(v * 126)), 127]   // FX page: each control's value
       : [...audio.vol.map(brightFor), 127];                      // knobs 1-8, then the filter knob
     const key = b.join(',');

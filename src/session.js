@@ -3,6 +3,7 @@
 // Storage is in projects.js; this file turns the looper's state into a project and back.
 import { Projects, supported } from './projects.js';
 import { defaultFx, readFx } from './fx.js';
+import { RETIRED } from './instruments.js';
 
 const FORMAT = 'zerkit-project', VERSION = 1;
 
@@ -86,12 +87,16 @@ export function setupSession(ctx) {
       // An instrument that's gone: the retired synthesised Drums quietly becomes the default kit;
       // a missing kit does too, with a warning.
       if (t.instrument === 'drums') t.instrument = DEFAULT_KIT;
+      if (RETIRED[t.instrument]) t.instrument = RETIRED[t.instrument];   // the old synthesised sounds
       // Audio: the project's audio instrument, made here if this computer hasn't got it (the old
       // generic "Audio" becomes one named after its input).
       if (t.instrument === 'audio') t.instrument = ctx.ensureAudio(t.input ?? 'Audio input', t.input);
       else if (t.instrument.startsWith('audio:') && !INSTRUMENTS[t.instrument]) ctx.ensureAudio(t.instrument.slice(6), t.input);
       else if (t.instrument.startsWith('midi:') && !INSTRUMENTS[t.instrument]) ctx.ensureMidi(t.instrument.slice(5), t.midi);
-      if (!INSTRUMENTS[t.instrument]) { lost.add(t.instrument.replace(/^kit:/, '')); t.instrument = DEFAULT_KIT; }
+      if (!INSTRUMENTS[t.instrument]) {
+        lost.add(t.instrument.replace(/^\w+:/, ''));
+        t.instrument = t.instrument.startsWith('kit:') ? DEFAULT_KIT : DEFAULTS[0];
+      }
       actions.instrument(i, t.instrument);
       octaves[i] = t.octave ?? octaves[i];
       const tr = engine.tracks[i];
@@ -106,7 +111,7 @@ export function setupSession(ctx) {
       audio.fx[i].set(readFx(t.fx));                     // also reads the earlier delay + reverb FX
     });
     audio.mix();
-    if (lost.size) setTimeout(() => toast(`Kit${lost.size > 1 ? 's' : ''} not found: ${[...lost].join(', ')} (using ${INSTRUMENTS[DEFAULT_KIT].name})`, 'warn'), 1400);
+    if (lost.size) setTimeout(() => toast(`Not found: ${[...lost].join(', ')} (using a built-in instead)`, 'warn'), 1400);
     engine.pass = json.nextPass ?? 1 + Math.max(0, ...json.tracks.flatMap(t => [...(t.notes ?? []), ...(t.clips ?? [])].map(n => n.pass)));
   }
 
@@ -235,6 +240,13 @@ export function setupSession(ctx) {
     dialog.querySelector('[data-act=cancel]').onclick = closeDialog;
   }
 
+  // A first save's suggested name: the date and time, to the second ("2026-11-25 18.42.07"), so
+  // Save then Play (or Enter) saves without typing.
+  const stamp = (d = new Date()) => {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}`;
+  };
+
   const ago = t => {
     const s = (Date.now() - t) / 1000;
     if (s < 60) return 'just now';
@@ -309,8 +321,8 @@ export function setupSession(ctx) {
     store,
     toast,
     ensureAccess,
-    save() { if (name) write(name); else nameBox('Save project', 'Untitled'); },
-    saveAs() { nameBox('Save as', name ? `${name} copy` : 'Untitled'); },
+    save() { if (name) write(name); else nameBox('Save project', stamp()); },
+    saveAs() { nameBox('Save as', name ? `${name} copy` : stamp()); },
     open() { if (dialog.hidden) openList(); else closeDialog(); },
     newProject() { if (isDirty() && !engine.isEmpty()) confirmNew(); else startNew(); },
     name: () => name,

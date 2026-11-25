@@ -1,20 +1,22 @@
-// Web Audio output: routes each track to its instrument (synth or drum rack)
+// Web Audio output: routes each track to its instrument (sampled, kit, audio or MIDI)
 // and plays the metronome. Implements the `out` interface the Engine expects.
-import { INSTRUMENTS, makeNoise } from './instruments.js';
+import { INSTRUMENTS } from './instruments.js';
 import { TrackFX } from './fx.js';
 
 export class AudioOut {
   constructor(trackCount) {
     this.ctx = new AudioContext({ latencyHint: 'interactive' });
-    // Everything leaves through `out` (the master volume). Browser sounds go through `master`
-    // (their level, see setSynthLevel) and a compressor first; audio tracks go straight to `out`.
+    // Everything leaves through `out` (the master volume). The browser's own sounds (instruments,
+    // kits) go through `master`, a fixed level that sits them against audio tracks, and a
+    // compressor first; audio tracks go straight to `out`; the click has its own level.
     this.out = new GainNode(this.ctx, { gain: 1 });
     this.out.connect(this.ctx.destination);
-    this.master = new GainNode(this.ctx, { gain: 0.6 });
+    this.master = new GainNode(this.ctx, { gain: 0.2 });
+    this.clickBus = new GainNode(this.ctx, { gain: 0.1 });
+    this.clickBus.connect(this.out);
     const comp = new DynamicsCompressorNode(this.ctx, { threshold: -14, ratio: 4 });
     this.master.connect(comp).connect(this.out);
-    this.noise = makeNoise(this.ctx);
-    this.instruments = Array(trackCount).fill('synth'); // keys of INSTRUMENTS
+    this.instruments = Array(trackCount).fill(null);   // keys of INSTRUMENTS (set by main.js)
     // Mixer: each track plays into its own gain, set from volume, mute and solo.
     this.vol = Array(trackCount).fill(0.8);   // 0-1, 0.8 = unity
     this.mute = Array(trackCount).fill(false);
@@ -55,7 +57,8 @@ export class AudioOut {
   }
 
   // Level of the browser sounds (synths, drums, click), 0-1. Audio tracks don't pass through it.
-  setSynthLevel(level) { this.master.gain.setTargetAtTime(1.2 * level * level, this.now(), 0.02); }
+  // The metronome click's level, 0-1 (0.5 = where it used to sit).
+  setClickLevel(level) { this.clickBus.gain.setTargetAtTime(0.4 * level * level, this.now(), 0.02); }
 
   // Overall output level, 0-1, same curve as the track volumes (0.8 = unity).
   setMasterVolume(v) { this.out.gain.setTargetAtTime((v * v) / 0.64, this.now(), 0.02); }
@@ -77,7 +80,7 @@ export class AudioOut {
   }
 
   voice(track, note, vel, t, onEnd) {
-    return INSTRUMENTS[this.instruments[track]].voice(this.ctx, this.bus[track], note, vel, t, onEnd, this.noise);
+    return INSTRUMENTS[this.instruments[track]].voice(this.ctx, this.bus[track], note, vel, t, onEnd);
   }
 
   noteOn(track, note, vel) {
@@ -121,8 +124,8 @@ export class AudioOut {
     const ctx = this.ctx;
     const o = new OscillatorNode(ctx, { type: 'sine', frequency: accent ? 1760 : 1175 });
     const g = new GainNode(ctx, { gain: 0 });
-    o.connect(g).connect(this.master);
-    g.gain.setValueAtTime(accent ? 0.5 : 0.28, t);
+    o.connect(g).connect(this.clickBus);
+    g.gain.setValueAtTime(accent ? 1 : 0.56, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
     o.start(t);
     o.stop(t + 0.06);

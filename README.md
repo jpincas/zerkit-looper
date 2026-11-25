@@ -1,6 +1,6 @@
 # MIDI Looper (web prototype)
 
-A minimal looper that uses the computer keyboard as input and a built-in Web Audio synth as output.
+A looper for the web (a Mac app later), played from the computer keyboard, MIDI keyboards and a Novation Circuit Tracks, with sampled instruments, kits, audio and MIDI tracks.
 It exists to get the looping logic right before Web MIDI / CoreMIDI hardware is wired in.
 
 ## Run
@@ -51,7 +51,7 @@ There are 8 tracks, laid out like the Circuit's track buttons (Synth 1–2, MIDI
 The page is laid out like the Circuit Tracks. Top to bottom:
 
 - **Knobs:** Master volume (everything the looper plays) on the left, a volume knob above each
-  track (with Shift: its left-right position, shown on the strip under it), and Internal sounds on the right. The Circuit's master volume and master filter knobs
+  track (with Shift: its left-right position, shown on the strip under it), and Click (the metronome's level) on the right. The Circuit's master volume and master filter knobs
   turn the two outer ones. Drag up/down or scroll to turn; double-click resets.
 - **Row above the tracks:** Play/Hide (the play controls; the Circuit's Scales button) | Octave ▼ ▲ (Shift: move the selected track's notes an octave), Q (cycles the selected track's record
   quantise; each track button shows its own: Q off, Q 32, Q 16), Tempo (tap: click; hold + filter knob or scroll: tempo;
@@ -82,14 +82,16 @@ it does (small blue, marked with a clock), what a tap does (the main label), the
 key, the Circuit's Shift, or the on-screen Shift) the buttons with a Shift action light up; while
 Tempo is held on the Circuit, its hold action lights up. Greyed-out buttons aren't used yet.
 
-**Play / Hide** (the Circuit's Scales button; Note mode on the Circuit) opens a playing panel under the looper: a two-octave keyboard on synth tracks, or the
+**Play / Hide** (the Circuit's Scales button; Note mode on the Circuit) opens a playing panel under the looper: a two-octave keyboard on instrument and MIDI tracks, or the
 16-pad kit on drum tracks (pads 1–8 along the bottom, under the eight tracks; 9–16 above). The
 computer keyboard plays the first octave, or the first 12 pads.
 
 A track plays one of three kinds of sound:
 
-- **Instruments** (melodic): Synth, Bass, Pluck, Pad, Keys (FM electric piano), Organ, Bell, all
-  synthesised in the browser. Each track remembers its own keyboard octave.
+- **Instruments** (melodic, sampled): Grand Piano, Upright Bass, Cello, Vibraphone, Harp, plus your
+  own (see Sampled instruments). Tracks 1-4 start on Grand Piano, Upright Bass, Vibraphone and
+  Cello. Each track remembers its own keyboard octave. (The old synthesised sounds are retired:
+  projects that used them open with the nearest sampled instrument.)
 - **Kits**: 16 samples on 16 pads (see Kits). Tracks 5-8 start on the Acoustic kit.
 - **Audio**: an audio instrument, i.e. a named audio input (see Audio tracks).
 - **MIDI**: a MIDI instrument, i.e. an external instrument played over MIDI (see MIDI tracks).
@@ -112,7 +114,7 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Preset / Shift + Preset | The selected track's next instrument (of those switched on) / Instruments page on and off |
 | Mixer / Shift + Mixer | The selected track's next audio instrument / Audio page on and off |
 | Patterns / Shift + Patterns | The selected track's next kit (of those switched on) / Kits page on and off |
-| Octave ▼ ▲ / Shift + Octave ▼ ▲ | Keyboard octave / move the selected track's notes an octave (synth tracks) |
+| Octave ▼ ▲ / Shift + Octave ▼ ▲ | Keyboard octave / move the selected track's notes an octave (instrument and MIDI tracks) |
 | Tempo/Swing: tap | Click on/off |
 | Hold Tempo/Swing + turn the master filter knob | Tempo (with Shift held too: swing) |
 | Macro knob above each track / with Shift | That track's volume / left-right position |
@@ -123,7 +125,7 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Save / Shift + Save | Save the project / save as |
 | Projects / Shift + Projects | Open a recent project (on screen) / new project |
 | Master volume knob | Master volume |
-| Master filter knob | Internal sounds level |
+| Master filter knob | Click level (hold Tempo: tempo; Shift too: swing) |
 
 **Track view** (default):
 
@@ -133,7 +135,7 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Row 2 | Solo each track (green = soloed; several can be soloed) |
 | Rows 3–4 | 16-step view of the selected track: the bar the playhead is in, notes in the track colour |
 
-**Note mode** on a synth track: all 32 pads are a two-octave keyboard with velocity. Rows 1–2 are
+**Note mode** on an instrument or MIDI track: all 32 pads are a two-octave keyboard with velocity. Rows 1–2 are
 the upper octave and rows 3–4 the lower; in each pair, black keys are above white keys. On a drum
 track: rows 1–2 stay mute and solo, rows 3–4 are the 16-pad kit, laid out as on screen. Track
 buttons still select tracks.
@@ -168,6 +170,27 @@ project is a folder:
 
 Saving from the Circuit works once the folder has been allowed in this session (a click on the
 page is needed for that; a Circuit button doesn't count).
+
+## Sampled instruments
+
+A sampled instrument is recorded notes spread across the keyboard: each key plays the nearest
+recording in its velocity layer, re-pitched, with a natural release. Samples load the first time
+an instrument is used. Five come built in (see `instruments/README.md`).
+
+Make your own on the Instruments page (Shift + Instrument): **＋ New instrument** opens the maker.
+
+- **Sample a hardware instrument:** choose a MIDI instrument to play (e.g. your Moog) and an audio
+  instrument to record it through, set the range and how it's sampled, and press **Sample** (Play
+  on the Circuit). It plays each note, records it, trims it to its attack and tail, and matches
+  levels across the instrument (keeping its dynamics). Stop at any time.
+- **Or drop audio files** on the maker: each one's note comes from its name ("Piano_C4.wav",
+  "Moog A#2").
+- The eight settings are the Circuit's knobs 1-8: Low note, High note, Every (semitones), Layers
+  (velocities 1-3), Note length, Tail, Release, Octave (the keyboard's starting octave). Click a
+  sampled note to hear it, ✕ to remove it. **Save** (Record on the Circuit) names and keeps it.
+
+Your instruments are kept in the projects folder, in `Instruments/` (`My Moog.zinst/instrument.json`
+and `samples/*.wav`); ✎ on its card edits one.
 
 ## Kits
 
@@ -249,14 +272,17 @@ audio instruments they're kept on this computer and projects remember their sett
 - `src/engine.js`: transport, record state machine and lookahead scheduler. It's pure logic
   that talks to an `out` interface, so it can be swapped for MIDI output later.
 - `src/audio.js`: Web Audio implementation of `out`. It routes each track to its instrument and plays the click.
-- `src/instruments.js`: the synth voices and the kit pad layout; `src/audioinst.js` /
+- `src/instruments.js`: the instrument registry and the kit pad layout; `src/audioinst.js` /
   `src/midiinst.js`: audio and MIDI instruments and their pages; `src/cards.js`: the square
   cards every page uses; `src/fx.js` / `src/fxpage.js`: the per-track pedals, and the FX page.
 - `src/projects.js`: the projects folder and the project files; `src/session.js`: the current
   project (saving, opening, new) and its screens.
 - `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits
   page and kit editor.
-- `kits/`: the built-in kits; `tools/build_kits.py` builds them.
+- `kits/`: the built-in kits; `tools/build_kits.py` builds them. `instruments/`: the built-in
+  sampled instruments; `tools/build_instruments.py` builds them.
+- `src/sampler.js`: sampled instruments (zones, playback, storage); `src/instpage.js`: the
+  Instruments page and the instrument maker.
 - `src/roll.js`: canvas piano roll (one per track).
 - `src/keys.js`: computer-keyboard note mapping.
 - `src/audioin.js`, `src/capture-worklet.js`: audio inputs, captured continuously so takes can be cut out of them.

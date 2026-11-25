@@ -25,6 +25,7 @@ midiAccess().then(m => {
   scan();
 }).catch(() => {});
 const outputNamed = name => ports.outputs.find(p => p.name === name && p.state !== 'disconnected');
+export const outputPort = outputNamed;                 // for the sampler
 
 // Context time -> performance.now() time of when that moment is heard, so MIDI lands with the audio.
 function perfTime(ctx, t) {

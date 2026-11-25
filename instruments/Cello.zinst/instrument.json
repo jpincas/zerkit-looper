@@ -1,0 +1,82 @@
+{
+ "format": "zerkit-instrument",
+ "version": 1,
+ "name": "Cello",
+ "color": "#d0805a",
+ "octave": 2,
+ "release": 0.35,
+ "zones": [
+  {
+   "file": "1-024.flac",
+   "root": 24,
+   "lo": 0,
+   "hi": 27,
+   "velLo": 1,
+   "velHi": 127
+  },
+  {
+   "file": "1-030.flac",
+   "root": 30,
+   "lo": 28,
+   "hi": 33,
+   "velLo": 1,
+   "velHi": 127
+  },
+  {
+   "file": "1-036.flac",
+   "root": 36,
+   "lo": 34,
+   "hi": 39,
+   "velLo": 1,
+   "velHi": 127
+  },
+  {
+   "file": "1-042.flac",
+   "root": 42,
+   "lo": 40,
+   "hi": 45,
+   "velLo": 1,
+   "velHi": 127
+  },
+  {
+   "file": "1-048.flac",
+   "root": 48,
+   "lo": 46,
+   "hi": 51,
+   "velLo": 1,
+   "velHi": 127
+  },
+  {
+   "file": "1-054.flac",
+   "root": 54,
+   "lo": 52,
+   "hi": 58,
+   "velLo": 1,
+   "velHi": 127
+  },
+  {
+   "file": "1-063.flac",
+   "root": 63,
+   "lo": 59,
+   "hi": 66,
+   "velLo": 1,
+   "velHi": 127
+  },
+  {
+   "file": "1-069.flac",
+   "root": 69,
+   "lo": 67,
+   "hi": 70,
+   "velLo": 1,
+   "velHi": 127
+  },
+  {
+   "file": "1-072.flac",
+   "root": 72,
+   "lo": 71,
+   "hi": 127,
+   "velLo": 1,
+   "velHi": 127
+  }
+ ]
+}
