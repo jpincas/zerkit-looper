@@ -12,7 +12,7 @@ const EXT = '.zinst', FOLDER = 'Instruments', FORMAT = 'zerkit-instrument';
 export const samplerKey = name => `smp:${name}`;
 const COLORS = ['#e8c26a', '#d0805a', '#7fc4e0', '#c7b7f0', '#9ad06a', '#f08ad0'];
 const colorFor = name => COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 11) % COLORS.length];
-const LEVEL = 0.55;                                   // against the synths (samples peak at -1 dBFS)
+const LEVEL = 1.4;                                  // against the kits (samples peak at -1 dBFS)
 
 function pickZone(zones, note, vel) {
   const inVel = zones.filter(z => vel >= z.velLo && vel <= z.velHi);

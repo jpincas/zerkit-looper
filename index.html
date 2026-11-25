@@ -8,23 +8,14 @@
 </head>
 <body>
   <main class="app">
-    <!-- Status strip: what's happening, and what's connected -->
-    <header class="strip">
-      <div class="readout"><span id="pos">1.1</span><small>BAR.BEAT</small></div>
-      <div class="beats" id="beats"><i></i><i></i><i></i><i></i></div>
-      <div id="project" class="project" title="The current project (• = unsaved changes)">Untitled</div>
-      <div id="status" class="status">Stopped</div>
-      <div id="circuit" class="pill">Circuit: …</div>
-      <div id="midi-in" class="pill">MIDI in: …</div>
-    </header>
-
     <div id="sound-gate" class="sound-gate" hidden>Sound is off: click anywhere on this page to turn it on. Browsers only allow sound after a click or key press on the page.</div>
 
     <!-- The panel, laid out like the Circuit Tracks -->
     <section class="device" id="device">
       <div class="brand">
         <div class="wordmark"><b>ZERKIT</b><span>LOOPER</span></div>
-        <div class="badge" aria-hidden="true">
+        <div id="project" class="project" title="The current project (• = unsaved changes)">Untitled</div>
+        <div class="badge" id="circuit" title="Circuit: not connected">
           <svg viewBox="0 0 100 50"><path d="M50 25C40 10 12 8 12 25C12 42 40 40 50 25C60 10 88 8 88 25C88 42 60 40 50 25Z"/></svg>
         </div>
       </div>
@@ -45,6 +36,9 @@
             <select id="inst" class="inst" aria-label="Instrument for the selected track"></select>
             <span id="oct" class="seq-oct" title="Keyboard octave (, .)">C4</span>
             <span id="seq-len" class="seq-len"></span>
+            <span id="status" class="status">Stopped</span>
+            <span id="pos" class="pos" title="Bar.beat">1.1</span>
+            <span class="beats" id="beats"><i></i><i></i><i></i><i></i></span>
           </div>
           <div class="roll-wrap"><canvas id="roll" class="roll"></canvas></div>
         </div>

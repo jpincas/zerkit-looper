@@ -50,6 +50,8 @@ There are 8 tracks, laid out like the Circuit's track buttons (Synth 1–2, MIDI
 
 The page is laid out like the Circuit Tracks. Top to bottom:
 
+- **Logo row:** the project's name, and the ∞ badge, which glows green while the Circuit is
+  connected (hover it for the connection's state).
 - **Knobs:** Master volume (everything the looper plays) on the left, a volume knob above each
   track (with Shift: its left-right position, shown on the strip under it), and Click (the metronome's level) on the right. The Circuit's master volume and master filter knobs
   turn the two outer ones. Drag up/down or scroll to turn; double-click resets.
@@ -71,7 +73,7 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   instrument's colour when on, dim when off, white for the selected track's own.
   Shift + Kits (the Circuit's Patterns button) opens **Kits** (see below). The same again goes back.
 - **Pads:** a mute strip and a solo strip, one pad under each track, sharing the first pad row.
-  Below them, filling the other three rows, the selected track's sequencer on the shared timeline (the longest loop), with repeats of shorter loops drawn faded.
+  Below them, filling the other three rows, the selected track's sequencer on the shared timeline (the longest loop), with repeats of shorter loops drawn faded. Its header shows the transport: what the looper is doing, the bar.beat and the beat dots.
 - **Beside the pads:** MIDI (the Circuit's Note: tap for the next MIDI instrument, Shift for the
   MIDI page), Velocity, Gate, Pattern Settings on the left; Audio (the
   Circuit's Mixer: tap for the next audio instrument, Shift for the Audio page), FX, Record,
@@ -155,7 +157,7 @@ them live exactly as played; the loop plays them on the grid from the next pass.
 brief "Saved" notice. **⇧ Save** (⇧⌘S) saves under a new name. **Open** (⌘O) lists recent
 projects, newest first (↑ ↓ and Enter, or click). **⇧ Open** starts a new project. Opening or
 starting a new project asks first if there are unsaved changes. The current project's name is in
-the status strip, with • while there are unsaved changes (Save shows it too, and its light on the
+the logo row, with • while there are unsaved changes (Save shows it too, and its light on the
 Circuit is white).
 
 Projects live in a folder on your computer, chosen the first time you save (Chrome asks for

@@ -589,10 +589,7 @@ connectMidiKeyboards({
     for (const src of sustained) release(src);
     sustained.clear();
   },
-  onStatus: text => {
-    $('midi-in').textContent = `MIDI in: ${text}`;
-    $('midi-in').classList.toggle('on', !/none|refused|no Web/.test(text));
-  },
+  onStatus: () => {},                    // MIDI in's state isn't shown for now
 });
 
 // ---- pages ----------------------------------------------------------------------
@@ -779,11 +776,6 @@ function frame() {
 requestAnimationFrame(frame);
 
 // ---- Novation Circuit Tracks control surface (patched firmware) ---------------
-let circuitStatus = '…';
-setInterval(() => {
-  const mode = circuitStatus === 'connected' && app.circuitMode?.() === 'note' ? ' · Note mode' : '';
-  setText($('circuit'), `Circuit: ${circuitStatus}${mode}`);
-}, 100);
 // ---- projects --------------------------------------------------------------------
 const session = setupSession({
   engine, audio, actions, octaves, presetOn, kitOn, audioOn, midiOn, makeClip, DEFAULTS, DEFAULT_KIT, INSTRUMENTS,
@@ -811,7 +803,7 @@ const instPage = setupInstrumentPage({ root: $('page-presets'), audio, engine, p
 const kitPage = setupKitPage({ root: $('page-kits'), audio, engine, kitOn, session, onKitsChanged: fillInstruments, builtInKits });
 session.store.onGranted = () => { kitPage.refresh(); instPage.refresh(); };   // folder allowed: your kits and instruments
 instPage.refresh();
-// The project's name in the status strip (• = unsaved changes); Save lights up when there are some.
+// The project's name in the logo row (• = unsaved changes); Save lights up when there are some.
 setInterval(() => {
   const dirty = session.dirty();
   setText($('project'), session.name() ?? 'Untitled');
@@ -833,9 +825,9 @@ const app = {
   canTranspose: () => !isDrums(engine.selected) && !isAudio(engine.selected) && engine.tracks[engine.selected].notes.length > 0,
   holding: null,                 // the Circuit button being held for its hold action ('tempo')
   heldNotes: t => [...pressed.values()].filter(p => p.track === t).map(p => p.note),
-  onStatus: text => {
-    circuitStatus = text;
+  onStatus: text => {                    // the logo's badge glows green while the Circuit is connected
     $('circuit').classList.toggle('on', text === 'connected');
+    $('circuit').title = `Circuit: ${text}`;
   },
 };
 connectCircuit(app);

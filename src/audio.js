@@ -56,9 +56,8 @@ export class AudioOut {
     this.panner[t].pan.setTargetAtTime(this.pan[t], this.now(), 0.015);
   }
 
-  // Level of the browser sounds (synths, drums, click), 0-1. Audio tracks don't pass through it.
-  // The metronome click's level, 0-1 (0.5 = where it used to sit).
-  setClickLevel(level) { this.clickBus.gain.setTargetAtTime(0.4 * level * level, this.now(), 0.02); }
+  // The metronome click's level, 0-1, on a squared curve.
+  setClickLevel(level) { this.clickBus.gain.setTargetAtTime(0.18 * level * level, this.now(), 0.02); }
 
   // Overall output level, 0-1, same curve as the track volumes (0.8 = unity).
   setMasterVolume(v) { this.out.gain.setTargetAtTime((v * v) / 0.64, this.now(), 0.02); }
@@ -120,12 +119,14 @@ export class AudioOut {
     this.scheduled.add(v);
   }
 
+  // A soft tick: a lowish sine with a 3 ms rise (no snap at its start), the bar's first beat higher.
   click(t, accent) {
     const ctx = this.ctx;
-    const o = new OscillatorNode(ctx, { type: 'sine', frequency: accent ? 1760 : 1175 });
+    const o = new OscillatorNode(ctx, { type: 'sine', frequency: accent ? 1320 : 880 });
     const g = new GainNode(ctx, { gain: 0 });
     o.connect(g).connect(this.clickBus);
-    g.gain.setValueAtTime(accent ? 1 : 0.56, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(accent ? 1 : 0.6, t + 0.003);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
     o.start(t);
     o.stop(t + 0.06);
