@@ -62,10 +62,11 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   Shift: swing; shows tempo · swing), Undo (Shift: redo), Clear track, Save (Shift: save as), Open (Shift:
   new project) | Shift (holds for the next press).
 - **Track row:** Instrument (tap: the selected track's next melodic instrument, of those switched
-  on; Shift: the Instruments page) | the eight track buttons | Kits (tap: next kit; Shift: the
-  Kits page). A small icon by each track's name shows its type: keyboard (instrument), pads (kit),
-  waveform (audio). Each track button shows its instrument, loop length and activity. Click one,
-  press `1`–`8`, or press its Circuit button to select it.
+  on; Shift: the Instruments page) | the eight track buttons | Jam, track "0" in dark grey (tap or
+  `0`: deselect every track, see below). A small icon by each track's name shows its type: keyboard
+  (instrument), pads (kit), saw-and-square (synth), waveform (audio). Each track button shows its
+  instrument (a synth track: its preset), loop length and activity. Click one, press `1`–`8`, or
+  press its Circuit button to select it.
 - **Pages:** the pad area shows the Looper, or another page. Shift + Instrument opens
   **Instruments**: every melodic instrument with a switch for whether Instrument cycles through it
   (and which tracks use it). Shift + Audio opens **Audio**, Shift + MIDI opens **MIDI**.
@@ -73,14 +74,16 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   card (or its pad on the Circuit) to switch it in or out of its button's cycle; ✎ edits kits,
   audio and MIDI instruments; **＋ New** is underneath. On the Circuit, a card's pad shows the
   instrument's colour when on, dim when off, white for the selected track's own.
-  Shift + Kits (the Circuit's Patterns button) opens **Kits** (see below). The same again goes back.
+  Shift + Kits opens **Kits** (see below). The same again goes back.
 - **Pads:** a mute strip and a solo strip, one pad under each track, sharing the first pad row.
   Below them, filling the other three rows, the selected track's sequencer on the shared timeline (the longest loop), with repeats of shorter loops drawn faded. Its header shows the transport: what the looper is doing, the bar.beat and the beat dots.
-- **Beside the pads:** MIDI (the Circuit's Note: tap for the next MIDI instrument, Shift for the
-  MIDI page), Velocity, Gate (both unused so far) and Jam (the Circuit's Pattern Settings) on the
-  left; Audio (the
-  Circuit's Mixer: tap for the next audio instrument, Shift for the Audio page), FX, Record,
-  Play on the right.
+- **Beside the pads:** the sound sources down the left, under Instrument: Kits (tap: next kit;
+  Shift: the Kits page), Synth (see Synth tracks), Audio (tap: next audio instrument; Shift: the
+  Audio page) and MIDI (tap: next MIDI instrument; Shift: the MIDI page). On the right: a spare
+  button (unused so far), FX, Record, Play.
+
+**Jam** (track 0) deselects every track, so keyboards and pads play nothing in the looper and you
+can play your own instrument over the loop. Pick a track to come back.
 
 Each button shows its actions top to bottom: what Shift does (small grey, marked ⇧), what holding
 it does (small blue, marked with a clock), what a tap does (the main label), then any readout. While Shift is held (the Shift
@@ -91,13 +94,14 @@ Tempo is held on the Circuit, its hold action lights up. Greyed-out buttons aren
 16-pad kit on drum tracks (pads 1–8 along the bottom, under the eight tracks; 9–16 above). The
 computer keyboard plays the first octave, or the first 12 pads.
 
-A track plays one of three kinds of sound:
+A track plays one of five kinds of sound:
 
 - **Instruments** (melodic, sampled): Grand Piano, Upright Bass, Cello, Vibraphone, Harp, plus your
   own (see Sampled instruments). Tracks 1-4 start on Grand Piano, Upright Bass, Vibraphone and
   Cello. Each track remembers its own keyboard octave. (The old synthesised sounds are retired:
   projects that used them open with the nearest sampled instrument.)
 - **Kits**: 16 samples on 16 pads (see Kits). Tracks 5-8 start on the Acoustic kit.
+- **Synth**: a subtractive synth, its own settings on each track (see Synth tracks).
 - **Audio**: an audio instrument, i.e. a named audio input (see Audio tracks).
 - **MIDI**: a MIDI instrument, i.e. an external instrument played over MIDI (see MIDI tracks).
 
@@ -117,15 +121,17 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Duplicate | Clear the selected track |
 | Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 |
 | Preset / Shift + Preset | The selected track's next instrument (of those switched on) / Instruments page on and off |
-| Mixer / Shift + Mixer | The selected track's next audio instrument / Audio page on and off |
-| Patterns / Shift + Patterns | The selected track's next kit (of those switched on) / Kits page on and off |
+| Note / Shift + Note | The selected track's next kit (of those switched on) / Kits page on and off |
+| Velocity | Make the selected track a synth track and show its synth / on a synth track: Synth page on and off (knob: a column's main control; hold pad 1-3 + knob: its controls; bottom pad: on/off; Shift + pad: one of 32 presets) |
+| Gate / Shift + Gate | The selected track's next audio instrument / Audio page on and off |
+| Pattern Settings / Shift + Pattern Settings | The selected track's next MIDI instrument / MIDI page on and off |
+| Patterns | Jam (its light amber while jamming) |
 | Octave ▼ ▲ / Shift + Octave ▼ ▲ | Keyboard octave / move the selected track's notes an octave (instrument and MIDI tracks) |
 | Tempo/Swing: tap | Click on/off |
 | Hold Tempo/Swing + turn the master filter knob | Tempo (with Shift held too: swing) |
 | Macro knob above each track / with Shift | That track's volume / left-right position |
 | Scales | Switch between track view and Note mode (and the play controls on screen) |
 | FX / Shift + FX | The selected track's 8 FX pedals (knob: a pedal's mix; hold pad 1-3 + knob: its controls; bottom pad: footswitch; Shift + pad: one of 32 presets) / bypass them |
-| Note / Shift + Note | The selected track's next MIDI instrument / MIDI page on and off |
 | 1-16/17-32 | Cycle the selected track's record quantise (its light: red off, amber 32nds, green 16ths) |
 | Save / Shift + Save | Save the project / save as |
 | Projects / Shift + Projects | Open a recent project (on screen) / new project |
@@ -220,7 +226,7 @@ A project refers to its kits by name.
 ## Audio tracks
 
 An **audio instrument** is a named audio input: "CP88" = the CP88's USB audio. Make them on the
-Audio page (Shift + Audio, the Circuit's Mixer button): **＋ New audio**, a name and an input.
+Audio page (Shift + Audio, the Circuit's Gate button): **＋ New audio**, a name and an input.
 They're kept on this computer (inputs belong to the machine); projects remember each one's name
 and input, so opening a project elsewhere makes the ones it needs. **Audio** (tap) cycles the
 selected track through the ones switched on; choosing one connects the track to its input.
@@ -262,11 +268,42 @@ Stutter, Swirl). The loaded one is white. Turning a pedal's control switches it 
 and on; a purple FX badge on the track shows when a pedal is on. A pedal's audio is only made the
 first time it's switched on. Each track's FX is saved with the project.
 
+## Synth tracks
+
+**Synth** (the Circuit's Velocity button) makes the selected track a synth track and opens its
+synth; on a synth track it opens and closes the Synth page. Every track has its own synth
+settings, so eight synth tracks can sound completely different; they're saved with the project
+(kept even while a track plays something else). It's made of Web Audio nodes, like the FX, laid
+out left to right like a synth panel, one column per Circuit pad column:
+
+| Column | Main knob | Controls (hold pad 1 / 2 / 3 of the column and turn its knob) |
+| --- | --- | --- |
+| 1 Saw | Level | Octave, Detune, Spread (a detuned stack: supersaw) |
+| 2 Square | Level | Octave, Detune, Width (pulse width) |
+| 3 Sine | Level | Octave, FM (bells, e-pianos), FM ratio |
+| 4 Noise | Level | Colour, Decay (or Hold), Res |
+| 5 Filter | Cutoff | Resonance, Type (LP 24, LP 12, BP, HP), Key track |
+| 6 Filter env | Amount | Attack, Decay, Sustain (releases with the amp) |
+| 7 Amp env | Attack | Decay, Sustain, Release (off: a plain gate) |
+| 8 LFO | Depth | Rate (synced), Shape, To (pitch, filter or amp) |
+
+The bottom pad (or the round switch on screen) switches a column on and off; turning one of its
+controls switches it on. The header has the voice settings: **Poly / Mono / Legato** (legato
+doesn't restart the envelopes for a note played while another is held; letting go goes back to a
+key still down), **Glide**, **Velocity** (how much velocity sets loudness and the filter
+envelope's depth) and **Volume**. Turning a control changes notes already sounding.
+
+**Presets:** hold **Shift** for 32 presets in a 4 x 8 grid lying on the pads, a row each:
+Leads (Classic, Supersaw, Square Lead, Brass, Whistle, Screamer, Chip, Fat Lead), Bass (Sub Bass,
+Saw Bass, Acid, Reese, Pulse Bass, Wobble, FM Bass, Fat Bass), Pads (Warm Pad, Dream Pad, Strings,
+Organ, Choir, Glass Pad, Dark Pad, Sweep) and Plucks (Pluck, E-Piano, Bell, Marimba, Harp, Clav,
+Kalimba, Stab). New synth tracks start on Classic.
+
 ## MIDI tracks
 
 A **MIDI instrument** is an external instrument played over MIDI: a name, an **output** (a MIDI
 port and channel) and optionally an **input** (the keyboard that plays it; any keyboard if not
-set). Make them on the MIDI page (Shift + MIDI, the Circuit's Note button). A MIDI track records
+set). Make them on the MIDI page (Shift + MIDI, the Circuit's Pattern Settings button). A MIDI track records
 notes like any other and sends them, live and looped, to its output, timed to line up with the
 browser's audio; mute and solo apply, and the track's volume scales velocity. If the same
 instrument is both input and output, turn its Local Control off so it doesn't sound twice. Like
@@ -279,7 +316,8 @@ audio instruments they're kept on this computer and projects remember their sett
 - `src/audio.js`: Web Audio implementation of `out`. It routes each track to its instrument and plays the click.
 - `src/instruments.js`: the instrument registry and the kit pad layout; `src/audioinst.js` /
   `src/midiinst.js`: audio and MIDI instruments and their pages; `src/cards.js`: the square
-  cards every page uses; `src/fx.js` / `src/fxpage.js`: the per-track pedals, and the FX page.
+  cards every page uses; `src/fx.js` / `src/fxpage.js`: the per-track pedals, and the FX page; `src/synth.js` /
+  `src/synthpage.js`: the per-track synth, and the Synth page.
 - `src/projects.js`: the projects folder and the project files; `src/session.js`: the current
   project (saving, opening, new) and its screens.
 - `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits

@@ -16,6 +16,8 @@ import { setupMidiInstruments } from './midiinst.js';
 import { cardPage, tracksUsing } from './cards.js';
 import { setupFxPage } from './fxpage.js';
 import { PEDALS } from './fx.js';
+import { registerSynth, SYNTH_KEY } from './synth.js';
+import { setupSynthPage } from './synthpage.js';
 
 const TRACKS = 8;
 const audio = new AudioOut(TRACKS);
@@ -43,6 +45,8 @@ const $ = id => document.getElementById(id);
 let page = 'looper';
 // Instruments (melodic) the Instrument button cycles through (all to start with). Saved per project.
 const presetOn = Object.fromEntries(Object.keys(INSTRUMENTS).filter(k => !INSTRUMENTS[k].kit && !INSTRUMENTS[k].audio && !INSTRUMENTS[k].midi).map(k => [k, true]));
+// The synth: one instrument, each track with its own settings (audio.synth[t]). Not in Instrument's cycle.
+registerSynth(audio);
 // MIDI instruments the MIDI button cycles through ("midi:<name>" -> on/off). Saved per project.
 const midiOn = {};
 // Audio instruments the Audio button cycles through ("audio:<name>" -> on/off). Saved per project.
@@ -54,6 +58,9 @@ const inst = t => INSTRUMENTS[audio.instruments[t]];
 const isDrums = t => !!inst(t).drums;
 const isAudio = t => !!inst(t).audio;
 const isMidi = t => !!inst(t).midi;
+const isSynth = t => !!inst(t).synth;
+// What a track button shows: the instrument, or on a synth track its preset.
+const nameOf = t => (isSynth(t) ? audio.synth[t].settings.preset : inst(t).name);
 
 // ---- keyboard octave (per track) ---------------------------------------------
 
@@ -142,6 +149,14 @@ const actions = {
     const t = engine.selected;
     actions.instrument(t, keys[(keys.indexOf(audio.instruments[t]) + 1) % keys.length]);
   },
+  // Synth: make the selected track a synth track and show its synth; on a synth track, show or
+  // hide the Synth page.
+  synth() {
+    const t = engine.selected;
+    if (isSynth(t)) return actions.togglePage('synth');
+    actions.instrument(t, SYNTH_KEY);
+    page = 'synth';
+  },
   // The click's level and the overall output. Both 0-1, remembered in this browser.
   clickLevel(v) { levels.click = clamp01(v); audio.setClickLevel(levels.click); saveLevels(); },
   masterVolume(v) { levels.master = clamp01(v); audio.setMasterVolume(levels.master); saveLevels(); },
@@ -154,7 +169,7 @@ const actions = {
 };
 // While jamming no track is selected, so what works on the selected track does nothing (Record
 // can still close a recording that's under way).
-for (const k of ['record', 'clearTrack', 'transpose', 'octave', 'quant', 'nextInstrument', 'nextKit', 'nextMidi', 'nextAudio']) {
+for (const k of ['record', 'clearTrack', 'transpose', 'octave', 'quant', 'nextInstrument', 'nextKit', 'nextMidi', 'nextAudio', 'synth']) {
   const f = actions[k];
   actions[k] = (...a) => (jam && !(k === 'record' && engine.rec !== 'idle') ? undefined : f(...a));
 }
@@ -279,16 +294,16 @@ for (const [row, col, key, def] of [
   [3, 10, 'shift', { tap: 'Shift', act: () => (shiftLatch = !shiftLatch), title: 'Shift: hold the Shift key, or click this for the next press' }],
   [4, 1, 'preset', { tap: 'Instrument', shift: 'List', act: e => (shifted(e) ? actions.togglePage('presets') : actions.nextInstrument(1)),
     title: 'Tap: the selected track\'s next instrument (of those switched on in the Instruments page). Shift: open the Instruments page, or go back to the Looper' }],
-  [4, 10, 'kits', { tap: 'Kits', shift: 'List', act: e => (shifted(e) ? actions.togglePage('kits') : actions.nextKit()),
+  // The sound sources, down the left: Instruments, Kits, Synth, Audio, MIDI.
+  [5, 1, 'kits', { tap: 'Kits', shift: 'List', act: e => (shifted(e) ? actions.togglePage('kits') : actions.nextKit()),
     title: 'Tap: the selected track\'s next kit (of those switched on in the Kits page). Shift: open the Kits page, or go back to the Looper' }],
-  [5, 1, 'midi', { tap: 'MIDI', shift: 'List', act: e => (shifted(e) ? actions.togglePage('midi') : actions.nextMidi()),
-    title: 'Tap: the selected track\'s next MIDI instrument (of those switched on in the MIDI page). Shift: open the MIDI page, or go back to the Looper' }],
-  [6, 1, 'velocity', { tap: 'Velocity' }],
-  [7, 1, 'gate', { tap: 'Gate' }],
-  [8, 1, 'jam', { tap: 'Jam', act: () => actions.jam(),
-    title: 'Jam: deselect every track, so your keyboard plays only itself over the loop. Pick a track to come back (0)' }],
-  [5, 10, 'audio', { tap: 'Audio', shift: 'List', act: e => (shifted(e) ? actions.togglePage('audio') : actions.nextAudio()),
+  [6, 1, 'synth', { tap: 'Synth', act: () => actions.synth(),
+    title: 'Make the selected track a synth track and show its synth (each track has its own). On a synth track: show or hide the synth. Hold Shift there for its 32 presets' }],
+  [7, 1, 'audio', { tap: 'Audio', shift: 'List', act: e => (shifted(e) ? actions.togglePage('audio') : actions.nextAudio()),
     title: 'Tap: the selected track\'s next audio instrument (of those switched on in the Audio page). Shift: open the Audio page, or go back to the Looper' }],
+  [8, 1, 'midi', { tap: 'MIDI', shift: 'List', act: e => (shifted(e) ? actions.togglePage('midi') : actions.nextMidi()),
+    title: 'Tap: the selected track\'s next MIDI instrument (of those switched on in the MIDI page). Shift: open the MIDI page, or go back to the Looper' }],
+  [5, 10, 'spare', { tap: '', title: 'Not used yet' }],
   [6, 10, 'fx', { tap: 'FX', shift: 'Bypass', act: e => (shifted(e) ? fxPage.bypass() : actions.togglePage('fx')),
     title: 'Tap: the selected track\'s FX, 8 pedals (on the Circuit: a column\'s knob turns its pedal\'s mix; hold pad 1-3 of the column and turn for its controls; the bottom pad is the footswitch). Shift: bypass its FX' }],
   [7, 10, 'record', { tap: 'Record', act: () => actions.record(), title: 'Record (X)' }],
@@ -298,6 +313,13 @@ for (const [row, col, key, def] of [
   if (b.parentElement.id === 'device') { b.style.gridRow = row; b.style.gridColumn = col; }
   btn[key] = b;
 }
+// Jam sits to the right of the track buttons, as track "0".
+btn.jam = el('button', 'tbtn jam', '<span class="tnum">0</span><span class="tinst"><i class="ticon"></i><span class="tname">Jam</span></span>');
+btn.jam.title = 'Jam: deselect every track, so your keyboard plays only itself over the loop. Pick a track to come back (0)';
+btn.jam.addEventListener('click', () => { audio.resume(); actions.jam(); });
+Object.assign(btn.jam.style, { gridRow: 4, gridColumn: 10 });
+$('device').appendChild(btn.jam);
+
 btn.tempo.addEventListener('wheel', e => {
   e.preventDefault();
   const d = e.deltaY < 0 ? 1 : -1;
@@ -330,7 +352,8 @@ function fillInstruments() {
   const opt = ([k, v]) => `<option value="${k}">${v.name.replace(/</g, '&lt;')}</option>`;
   const all = Object.entries(INSTRUMENTS), sorted = list => list.sort((a, b) => a[0].localeCompare(b[0]));
   const kits = sorted(all.filter(([, v]) => v.kit)), auds = sorted(all.filter(([, v]) => v.audio)), midis = sorted(all.filter(([, v]) => v.midi));
-  instSelect.innerHTML = `<optgroup label="Instruments">${all.filter(([, v]) => !v.kit && !v.audio && !v.midi).map(opt).join('')}</optgroup>`
+  instSelect.innerHTML = `<optgroup label="Synth">${all.filter(([, v]) => v.synth).map(opt).join('')}</optgroup>`
+    + `<optgroup label="Instruments">${all.filter(([, v]) => !v.kit && !v.audio && !v.midi && !v.synth).map(opt).join('')}</optgroup>`
     + (kits.length ? `<optgroup label="Kits">${kits.map(opt).join('')}</optgroup>` : '')
     + (auds.length ? `<optgroup label="Audio">${auds.map(opt).join('')}</optgroup>` : '')
     + (midis.length ? `<optgroup label="MIDI">${midis.map(opt).join('')}</optgroup>` : '');
@@ -613,7 +636,10 @@ connectMidiKeyboards({
 
 // Instruments page: a card per melodic instrument (tap: in or out of Instrument's cycle).
 // FX page: the selected track's pedalboard.
-const fxPage = setupFxPage({ root: $('page-fx'), audio, engine, trackName: t => inst(t).name,
+const fxPage = setupFxPage({ root: $('page-fx'), audio, engine, trackName: nameOf,
+  shiftHeld: () => shiftDown(), consumeShift: () => { shiftLatch = false; } });
+// Synth page: the selected track's synth.
+const synthPage = setupSynthPage({ root: $('page-synth'), audio, engine, isSynth,
   shiftHeld: () => shiftDown(), consumeShift: () => { shiftLatch = false; } });
 
 
@@ -625,11 +651,15 @@ function pageCards() {
     case 'audio': return audioPage.editing() ? null : audioPage.cards;
     case 'midi': return midiPage.editing() ? null : midiPage.cards;
     case 'fx': return fxPage.cards;
+    case 'synth': return synthPage.cards;
   }
   return null;
 }
 
 function drawPage() {
+  // The Synth page is only for synth tracks: picking another track, switching this one to another
+  // sound, or jamming goes back to the Looper.
+  if (page === 'synth' && (jam || !isSynth(engine.selected))) page = 'looper';
   document.body.dataset.page = page;
   btn.preset.classList.toggle('page-on', page === 'presets');
   btn.kits.classList.toggle('page-on', page === 'kits');
@@ -638,6 +668,9 @@ function drawPage() {
   btn.fx.classList.toggle('page-on', page === 'fx');
   $('page-fx').hidden = page !== 'fx';
   if (page === 'fx') fxPage.update();
+  btn.synth.classList.toggle('page-on', page === 'synth');
+  $('page-synth').hidden = page !== 'synth';
+  if (page === 'synth') synthPage.update();
   const midiShown = !$('page-midi').hidden;
   $('page-midi').hidden = page !== 'midi';
   if (page === 'midi') { if (!midiShown) midiPage.show(); midiPage.update(); }
@@ -715,6 +748,7 @@ function frame() {
   $('sound-gate').hidden = !soundBlocked();
   setText($('status'), status());
   for (const f of audio.fx) f.setTempo(engine.bpm);        // delays follow the tempo
+  for (const s of audio.synth) s.setTempo(engine.bpm);     // so do synth LFOs
   document.body.dataset.rec = engine.rec;
   const beatIdx = engine.playing && b >= 0 ? Math.floor(b % bpb) : -1;
   beatDots.forEach((d, i) => d.classList.toggle('on', i === beatIdx));
@@ -757,8 +791,8 @@ function frame() {
     tb.el.classList.toggle('silent', !audio.audible(t));
     tb.m.classList.toggle('on', audio.mute[t]);
     tb.s.classList.toggle('on', audio.solo[t]);
-    setText(tb.name, inst(t).name);
-    tb.el.dataset.type = isAudio(t) ? 'audio' : isMidi(t) ? 'midi' : isDrums(t) ? 'kit' : 'inst';    // picks the icon by the name
+    setText(tb.name, nameOf(t));
+    tb.el.dataset.type = isAudio(t) ? 'audio' : isMidi(t) ? 'midi' : isDrums(t) ? 'kit' : isSynth(t) ? 'synth' : 'inst';    // picks the icon by the name
     tb.q.dataset.q = engine.tracks[t].quant;
     // FX: shown while a pedal is on (and the track's FX isn't bypassed)
     const fx = audio.fx[t].settings, pedals = PEDALS.filter(p => fx.pedals[p.id].on).map(p => p.name);
@@ -795,7 +829,7 @@ function frame() {
     $('kit').hidden = !drums;
     $('kb-audio').hidden = !isAudio(sel);
     setText($('kb-track'), `Track ${sel + 1}`);
-    setText($('kb-inst'), inst(sel).name);
+    setText($('kb-inst'), nameOf(sel));
     setText($('kb-oct'), drums || isAudio(sel) ? '' : `C${octaves[sel]}–B${octaves[sel] + 1}`);
     const down = new Set();
     for (const p of pressed.values()) if (p.track === sel) down.add(keyFor(sel, p.note));
@@ -858,12 +892,11 @@ setInterval(() => {
 }, 300);
 
 const app = {
-  engine, audio, actions, press, release, noteFor, isDrums, isAudio, isMidi, soundBlocked, levels, kitPad, pageCards,
-  fxNudge: (k, d) => fxPage.nudge(k, d),
+  engine, audio, actions, press, release, noteFor, isDrums, isAudio, isMidi, isSynth, soundBlocked, levels, kitPad, pageCards,
   fxBypass: () => fxPage.bypass(),
-  fxCodes: () => fxPage.codes(),
+  // The page whose columns the Circuit's 8 knobs turn (FX, Synth): { nudge, codes, values }.
+  knobPage: () => (page === 'fx' ? fxPage : page === 'synth' && isSynth(engine.selected) ? synthPage : null),
   pageControls: () => (page === 'presets' ? instPage.controls() : null),   // the instrument maker
-  fxValues: () => fxPage.values(),
   circuitShift: false,
   notePanel: () => notePanel,
   session,

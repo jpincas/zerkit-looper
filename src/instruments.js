@@ -3,14 +3,16 @@
 //   "kit:<name>"    16-pad sample kits (kits.js)
 //   "audio:<name>"  audio instruments, an audio input (audioinst.js)
 //   "midi:<name>"   MIDI instruments, played over MIDI (midiinst.js)
+//   "synth"         the synth, each track with its own settings (synth.js)
 // A definition has { name, color, octave?, voice?(ctx, dest, note, vel, time, onEnd) } plus its kind's
-// flag (sampled / kit / audio / midi). `octave` is where the keyboard starts for it.
+// flag (sampled / kit / audio / midi / synth). `octave` is where the keyboard starts for it.
 
 export const INSTRUMENTS = {};
 
-// What the retired synthesised sounds became (for projects that used them).
+// What the retired synthesised sounds became (for projects that used them; the old "synth" is
+// the synth again).
 export const RETIRED = {
-  synth: 'smp:Grand Piano', keys: 'smp:Grand Piano', organ: 'smp:Grand Piano', bass: 'smp:Upright Bass',
+  keys: 'smp:Grand Piano', organ: 'smp:Grand Piano', bass: 'smp:Upright Bass',
   pad: 'smp:Cello', pluck: 'smp:Harp', bell: 'smp:Vibraphone',
 };
 

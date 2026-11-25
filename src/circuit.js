@@ -3,7 +3,9 @@
 import { isBlack } from './keys.js';
 import { INSTRUMENTS } from './instruments.js';
 
-const BTN = { preset: 8, note: 9, jam: 12, kits: 13, audio: 14, fx: 15, scales: 18, duplicate: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
+// The sound sources go down the left column (Preset, Note, Velocity, Gate, Pattern Settings):
+// Instruments, Kits, Synth, Audio, MIDI. Jam is the Patterns button, right of the track buttons.
+const BTN = { preset: 8, kits: 9, synth: 10, audio: 11, midi: 12, jam: 13, spare: 14, fx: 15, scales: 18, duplicate: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
 const TRACK_BTNS = [0, 1, 2, 3, 4, 5, 6, 7];     // Synth 1-2, MIDI 1-2, Drum 1-4 -> tracks 1-8
 const N_LEDS = 69;
 const ledBtn = id => 32 + id;
@@ -18,6 +20,7 @@ const QUANT_CODE = { off: C.red, mid: C.amber, strong: C.green };
 const KIT_CODE = 0x4D;                           // any kit (teal)
 const AUDIO_CODE = 0x2D;                         // any audio instrument (yellow)
 const MIDI_CODE = 0x09;                          // any MIDI instrument (blue)
+const SYNTH_CODE = 0x32;                         // a synth track (pink)
 const INST_CODE = {                             // the built-in sampled instruments
   'smp:Grand Piano': 0x2B, 'smp:Upright Bass': 0x45, 'smp:Cello': 0x53, 'smp:Vibraphone': 0x13, 'smp:Harp': 0x49,
 };
@@ -43,7 +46,7 @@ function noteModeSemitone(p) {
 // The light colour for an instrument key.
 function codeFor(key) {
   const def = INSTRUMENTS[key];
-  return INST_CODE[key] ?? (def?.kit ? KIT_CODE : def?.audio ? AUDIO_CODE : def?.midi ? MIDI_CODE : def?.sampled ? OWN_CODE : C.white);
+  return INST_CODE[key] ?? (def?.kit ? KIT_CODE : def?.audio ? AUDIO_CODE : def?.midi ? MIDI_CODE : def?.synth ? SYNTH_CODE : def?.sampled ? OWN_CODE : C.white);
 }
 
 export function connectCircuit(app) {
@@ -110,7 +113,6 @@ export function connectCircuit(app) {
     if (TRACK_BTNS.includes(id)) return actions.select(id);
     switch (id) {
       case BTN.scales: return actions.toggleNotes();                                           // Note mode (Show/Hide)
-      case BTN.note: return shift ? actions.togglePage('midi') : actions.nextMidi();            // MIDI instruments
       case BTN.quant: return actions.quant();             // 1-16/17-32: the selected track's record quantise
       case BTN.play: return actions.play();
       case BTN.record: return actions.record();
@@ -118,14 +120,16 @@ export function connectCircuit(app) {
       case BTN.octUp: return shift ? actions.transpose(1) : actions.octave(1);
       case BTN.tempo: tempoHeld = true; tempoTurned = false; app.holding = 'tempo'; return;
       case BTN.preset: return shift ? actions.togglePage('presets') : actions.nextInstrument(1);   // Shift: Instruments page
-      case BTN.kits: return shift ? actions.togglePage('kits') : actions.nextKit();            // the Patterns button
-      case BTN.audio: return shift ? actions.togglePage('audio') : actions.nextAudio();        // the Mixer button
+      case BTN.kits: return shift ? actions.togglePage('kits') : actions.nextKit();            // the Note button
+      case BTN.synth: return actions.synth();                                                  // the Velocity button
+      case BTN.audio: return shift ? actions.togglePage('audio') : actions.nextAudio();        // the Gate button
+      case BTN.midi: return shift ? actions.togglePage('midi') : actions.nextMidi();            // the Pattern Settings button
       case BTN.fx: return shift ? app.fxBypass() : actions.togglePage('fx');                   // the track's pedals / bypass
       case BTN.save: return shift ? app.session.saveAs() : app.session.save();
       case BTN.open: return shift ? app.session.newProject() : app.session.open();              // the Projects button
       case BTN.clear: return shift ? actions.redo() : actions.undo();
       case BTN.duplicate: return actions.clearTrack();                                         // Clear track
-      case BTN.jam: return actions.jam();                                                      // the Pattern Settings button
+      case BTN.jam: return actions.jam();                                                      // the Patterns button
     }
   }
 
@@ -141,7 +145,7 @@ export function connectCircuit(app) {
   function knob(k, delta) {
     const controls = app.pageControls?.();               // e.g. the instrument maker's settings
     if (controls) return controls.knob(k, delta);
-    if (app.page() === 'fx') return app.fxNudge(k, delta);   // FX page: the 8 pedal controls
+    if (app.knobPage()) return app.knobPage().nudge(k, delta);   // FX / Synth page: its 8 columns
     if (shift) return actions.pan(k, delta * 0.03);  // Shift: that track's left-right position
     actions.volume(k, delta * 0.02);                 // knob above each track = its volume
   }
@@ -183,10 +187,11 @@ export function connectCircuit(app) {
     f[ledBtn(BTN.kits)] = app.page() === 'kits' ? C.white : C.dim;
     f[ledBtn(BTN.audio)] = app.page() === 'audio' ? C.white : C.dim;
     f[ledBtn(BTN.fx)] = app.page() === 'fx' ? C.white : C.dim;
+    f[ledBtn(BTN.synth)] = app.page() === 'synth' ? C.white : app.isSynth(sel) ? SYNTH_CODE : C.dim;
     f[ledBtn(BTN.save)] = projectDirty ? C.white : C.dim;                 // white: unsaved changes
     f[ledBtn(BTN.open)] = C.dim;
     f[ledBtn(BTN.scales)] = isNoteMode() ? C.white : C.dim;
-    f[ledBtn(BTN.note)] = app.page() === 'midi' ? C.white : C.dim;
+    f[ledBtn(BTN.midi)] = app.page() === 'midi' ? C.white : C.dim;
     f[ledBtn(BTN.play)] = app.soundBlocked?.() ? (blink ? C.red : C.off)     // sound blocked: click the page
       : engine.playing ? C.green : C.dim;
     f[ledBtn(BTN.record)] = {
@@ -207,7 +212,7 @@ export function connectCircuit(app) {
     // while Tempo is held, when it sets the tempo (white) or, with Shift, the swing (amber).
     for (let t = 0; t < 8; t++) {
       f[KNOB_LED + t] = app.pageControls?.() ? app.pageControls().codes()[t]     // a page's own settings
-        : app.page() === 'fx' ? app.fxCodes()[t]                // FX page: each pedal's colour
+        : app.knobPage() ? app.knobPage().codes()[t]            // FX / Synth page: each column's colour
         : audio.vol[t] > 0 ? instCode(t) : C.off;
     }
     f[KNOB_LED + 8] = tempoHeld ? (shift ? C.amber : C.white) : C.off;
@@ -282,8 +287,8 @@ export function connectCircuit(app) {
     if (!out) return;
     const controls = app.pageControls?.();
     const b = controls ? [...controls.values(), 127]
-      : app.page() === 'fx'
-      ? [...app.fxValues().map(v => Math.round(v * 126)), 127]   // FX page: each control's value
+      : app.knobPage()
+      ? [...app.knobPage().values().map(v => Math.round(v * 126)), 127]   // FX / Synth page: each control's value
       : [...audio.vol.map(brightFor), 127];                      // knobs 1-8, then the filter knob
     const key = b.join(',');
     if (key === lastBright) return;

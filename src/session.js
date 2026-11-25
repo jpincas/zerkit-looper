@@ -3,6 +3,7 @@
 // Storage is in projects.js; this file turns the looper's state into a project and back.
 import { Projects, supported } from './projects.js';
 import { defaultFx, readFx } from './fx.js';
+import { defaultSynth, readSynth } from './synth.js';
 import { RETIRED } from './instruments.js';
 
 const FORMAT = 'zerkit-project', VERSION = 1;
@@ -24,6 +25,7 @@ export function setupSession(ctx) {
         instrument, octave: octaves[t], quant: tr.quant,
         volume: audio.vol[t], pan: audio.pan[t], mute: audio.mute[t], solo: audio.solo[t],
         fx: structuredClone(audio.fx[t].settings),
+        synth: structuredClone(audio.synth[t].settings),   // kept even while the track plays something else
         loop: tr.loop ? { origin: tr.loop.origin, length: tr.loop.length } : null,
         notes: tr.notes.filter(n => n.dur != null).map(({ note, vel, start, dur, pass, kind }) => ({ note, vel, start, dur, pass, kind })),
       };
@@ -109,6 +111,7 @@ export function setupSession(ctx) {
       audio.solo[i] = !!t.solo;
       audio.setPan(i, t.pan ?? 0);
       audio.fx[i].set(readFx(t.fx));                     // also reads the earlier delay + reverb FX
+      audio.synth[i].set(readSynth(t.synth));
     });
     audio.mix();
     if (lost.size) setTimeout(() => toast(`Not found: ${[...lost].join(', ')} (using a built-in instead)`, 'warn'), 1400);
@@ -129,6 +132,7 @@ export function setupSession(ctx) {
       engine.tracks[i].quant = 'off';
       audio.vol[i] = 0.8; audio.mute[i] = false; audio.solo[i] = false; audio.setPan(i, 0);
       audio.fx[i].set(defaultFx());
+      audio.synth[i].set(defaultSynth());
     });
     audio.mix();
     engine.pass = 0;

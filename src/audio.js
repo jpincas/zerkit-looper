@@ -2,6 +2,7 @@
 // and plays the metronome. Implements the `out` interface the Engine expects.
 import { INSTRUMENTS } from './instruments.js';
 import { TrackFX } from './fx.js';
+import { TrackSynth } from './synth.js';
 
 export class AudioOut {
   constructor(trackCount) {
@@ -31,6 +32,8 @@ export class AudioOut {
       g.connect(this.fx[t].input);
       this.fx[t].output.connect(this.panner[t]).connect(this.master);
     });
+    // Each track's synth (used while the track plays the Synth instrument).
+    this.synth = this.bus.map(b => new TrackSynth(this.ctx, b));
     this.live = new Map();      // "track:note" -> voice (keys held right now)
     this.scheduled = new Set(); // voices/clicks scheduled by the engine
   }
