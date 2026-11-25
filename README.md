@@ -50,7 +50,8 @@ There are 8 tracks, laid out like the Circuit's track buttons (Synth 1–2, MIDI
 
 The page is laid out like the Circuit Tracks. Top to bottom:
 
-- **Logo row:** the project's name, and the ∞ badge, which glows green while the Circuit is
+- **Logo row:** in the middle, a calculator-style readout of the tempo (BPM), which shows the swing
+  % while Shift is held; then the project's name, and the ∞ badge, which glows green while the Circuit is
   connected (hover it for the connection's state).
 - **Knobs:** Master volume (everything the looper plays) on the left, a volume knob above each
   track (with Shift: its left-right position, shown on the strip under it), and Click (the metronome's level) on the right. The Circuit's master volume and master filter knobs

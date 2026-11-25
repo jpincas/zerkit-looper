@@ -590,6 +590,7 @@ connectMidiKeyboards({
     sustained.clear();
   },
   onStatus: () => {},                    // MIDI in's state isn't shown for now
+  isOwnOutput: name => Object.values(INSTRUMENTS).some(d => d.midi && d.output === name),
 });
 
 // ---- pages ----------------------------------------------------------------------
@@ -639,6 +640,33 @@ function drawPage() {
 
 // ---- render loop ------------------------------------------------------------
 
+// The readout in the logo row: three seven-segment digits, unlit segments faintly showing.
+const lcd = (() => {
+  const SEGS = {                                       // a b c d e f g, in a 40 x 70 cell
+    a: '6,3 9,0 31,0 34,3 31,6 9,6', b: '37,5 40,8 40,30 37,33 34,30 34,8', c: '37,37 40,40 40,62 37,65 34,62 34,40',
+    d: '6,67 9,64 31,64 34,67 31,70 9,70', e: '3,37 6,40 6,62 3,65 0,62 0,40', f: '3,5 6,8 6,30 3,33 0,30 0,8',
+    g: '6,35 9,32 31,32 34,35 31,38 9,38',
+  };
+  const DIGITS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
+  const root = $('lcd-digits');
+  root.innerHTML = [0, 1, 2].map(() => `<svg viewBox="-1 -1 42 72">${Object.entries(SEGS).map(([k, p]) => `<polygon data-s="${k}" points="${p}"/>`).join('')}</svg>`).join('');
+  const cells = [...root.children].map(svg => [...svg.children]);
+  let shown = '';
+  return {
+    show(value, unit) {
+      const text = String(Math.round(value)).slice(-3).padStart(3, ' ');
+      if (text + unit === shown) return;
+      shown = text + unit;
+      cells.forEach((segs, i) => {
+        const lit = text[i] === ' ' ? '' : DIGITS[Number(text[i])];
+        segs.forEach(seg => seg.classList.toggle('on', lit.includes(seg.dataset.s)));
+      });
+      setText($('lcd-unit'), unit);
+      $('lcd').classList.toggle('swing', unit !== 'BPM');
+    },
+  };
+})();
+
 const beatDots = [...document.querySelectorAll('#beats i')];
 
 function status() {
@@ -682,7 +710,7 @@ function frame() {
   btn.record.classList.toggle('has-loop', !!engine.tracks[sel].loop);
   btn.tempo.classList.toggle('on', engine.click);
   btn.tempo.classList.toggle('beat', engine.click && engine.playing && b >= 0 && b % 1 < 0.15);
-  setText(btn.tempo.querySelector('.pval'), `${engine.bpm} · ${engine.swing}%`);
+  lcd.show(shiftDown() ? engine.swing : engine.bpm, shiftDown() ? 'SWING' : 'BPM');
   btn.clear.classList.toggle('on', !engine.isEmpty() || engine.canRedo());
   btn.clearTrack.classList.toggle('on', engine.tracks[sel].notes.length + engine.tracks[sel].clips.length > 0);
   btn.shift.classList.toggle('on', shiftDown());

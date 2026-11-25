@@ -118,6 +118,7 @@ export function setupMidiInstruments({ root, audio, engine, midiOn, session, onC
       <div class="kit-edit audio-edit">
         <div class="ke-head">
           <input class="dlg-name ke-name" id="me-name" placeholder="Name, e.g. Minilogue" maxlength="40" spellcheck="false" value="${esc(def?.name ?? '')}">
+          <button class="dlg-btn" data-act="test" title="Sends two notes to the output: C now, then G half a second later">Test</button>
           <button class="dlg-btn" data-act="back">Back</button>
           <button class="dlg-btn primary" data-act="save">Save</button>
         </div>
@@ -128,9 +129,26 @@ export function setupMidiInstruments({ root, audio, engine, midiOn, session, onC
       </div>`;
     const nameEl = root.querySelector('#me-name');
     for (const el of root.querySelectorAll('input, select')) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && el === nameEl) save(); });
+    root.querySelector('[data-act=test]').onclick = test;
     root.querySelector('[data-act=back]').onclick = drawList;
     root.querySelector('[data-act=save]').onclick = save;
     if (!name) nameEl.focus();
+  }
+
+  // Two notes to the chosen output: middle C sent straight away, then G sent ahead with a timestamp
+  // (how the looper sends its notes). Hearing only the C means the instrument drops timestamped MIDI.
+  function test() {
+    const note = root.querySelector('#me-note');
+    const port = outputNamed(root.querySelector('#me-out').value);
+    if (!port) { note.innerHTML = '<b class="warn">Pick a connected output first.</b>'; return; }
+    const ch = (Number(root.querySelector('#me-ch').value) - 1) & 15, now = performance.now();
+    try {
+      port.send([0x90 | ch, 60, 100]);
+      setTimeout(() => port.send([0x80 | ch, 60, 0]), 400);
+      port.send([0x90 | ch, 67, 100], now + 600);
+      port.send([0x80 | ch, 67, 0], now + 1000);
+      note.textContent = `Sent to ${port.name}, channel ${ch + 1}: C now, then G half a second later (timestamped). Both = all good; only the C = it ignores timestamped notes; neither = it isn't listening to this port or channel.`;
+    } catch (err) { note.innerHTML = `<b class="warn">Couldn't send: ${esc(err.message)}</b>`; }
   }
 
   function save() {

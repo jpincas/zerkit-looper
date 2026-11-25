@@ -14,9 +14,13 @@
     <section class="device" id="device">
       <div class="brand">
         <div class="wordmark"><b>ZERKIT</b><span>LOOPER</span></div>
-        <div id="project" class="project" title="The current project (• = unsaved changes)">Untitled</div>
-        <div class="badge" id="circuit" title="Circuit: not connected">
-          <svg viewBox="0 0 100 50"><path d="M50 25C40 10 12 8 12 25C12 42 40 40 50 25C60 10 88 8 88 25C88 42 60 40 50 25Z"/></svg>
+        <!-- Calculator-style readout: the tempo, or the swing while Shift is held (built by main.js) -->
+        <div class="lcd" id="lcd" title="Tempo in BPM (Shift: swing %)"><div class="lcd-digits" id="lcd-digits"></div><span class="lcd-unit" id="lcd-unit">BPM</span></div>
+        <div class="brand-right">
+          <div id="project" class="project" title="The current project (• = unsaved changes)">Untitled</div>
+          <div class="badge" id="circuit" title="Circuit: not connected">
+            <svg viewBox="0 0 100 50"><path d="M50 25C40 10 12 8 12 25C12 42 40 40 50 25C60 10 88 8 88 25C88 42 60 40 50 25Z"/></svg>
+          </div>
         </div>
       </div>
       <div class="knob-cell master-vol" id="master-vol"></div>
