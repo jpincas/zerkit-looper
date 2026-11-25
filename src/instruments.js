@@ -135,13 +135,27 @@ export const INSTRUMENTS = {
   audio: { name: 'Audio', color: '#c9d46a', audio: true },
 };
 
-// ---- drum rack ------------------------------------------------------------
-// General MIDI layout from C1 (36). Any octave maps onto the same 12 pads.
+// ---- drum kit ---------------------------------------------------------------
+// 16 pads, in playing order: pads 1-8 are the bottom row (on the Circuit and on screen), 9-16 the
+// row above. Each plays its General MIDI drum note, so parts played in from a MIDI kit land on
+// the right sound. Notes outside the kit fold onto the GM octave from C1 (36), any octave.
 
-export const DRUM_BASE = 36;
-export const DRUM_NAMES = ['Kick', 'Rim', 'Snare', 'Clap', 'Snare 2', 'Tom 1', 'Closed HH', 'Tom 2', 'Pedal HH', 'Tom 3', 'Open HH', 'Tom 4'];
-export const DRUM_SHORT = ['Kick', 'Rim', 'Snare', 'Clap', 'Snr 2', 'Tom 1', 'CH', 'Tom 2', 'Pedal', 'Tom 3', 'OH', 'Tom 4'];
-export const drumIndex = note => (((note - DRUM_BASE) % 12) + 12) % 12;
+export const KIT = [
+  { note: 36, name: 'Kick' }, { note: 38, name: 'Snare' }, { note: 39, name: 'Clap' }, { note: 37, name: 'Rim' },
+  { note: 42, name: 'Closed HH', short: 'CH' }, { note: 44, name: 'Pedal HH', short: 'Pedal' },
+  { note: 46, name: 'Open HH', short: 'OH' }, { note: 40, name: 'Snare 2', short: 'Snr 2' },
+  { note: 41, name: 'Tom 1' }, { note: 43, name: 'Tom 2' }, { note: 45, name: 'Tom 3' }, { note: 47, name: 'Tom 4' },
+  { note: 49, name: 'Crash' }, { note: 51, name: 'Ride' }, { note: 54, name: 'Tambourine', short: 'Tamb' },
+  { note: 56, name: 'Cowbell', short: 'Bell' },
+];
+for (const p of KIT) p.short ??= p.name;
+// The kit pad (0-15) a note plays.
+export function kitPad(note) {
+  const i = KIT.findIndex(p => p.note === note);
+  if (i >= 0) return i;
+  const gm = 36 + ((((note - 36) % 12) + 12) % 12);           // fold onto 36-47
+  return KIT.findIndex(p => p.note === gm);
+}
 
 export function makeNoise(ctx) {
   const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -189,19 +203,23 @@ export function drumVoice(ctx, dest, note, vel, t, onEnd, noiseBuf) {
 
   const tom = f => tone(f * 1.6, f, 0.08, 0.35, 0.8);
 
-  switch (drumIndex(note)) {
-    case 0: tone(150, 42, 0.12, 0.45, 1.0); tone(900, 200, 0.01, 0.02, 0.25, 'triangle'); break; // kick
-    case 1: tone(1700, 1600, 0.01, 0.03, 0.3, 'square'); noise('highpass', 2000, 0.02, 0.25); break; // rim
-    case 2: tone(220, 160, 0.05, 0.12, 0.5, 'triangle'); noise('highpass', 1200, 0.2, 0.55); break; // snare
-    case 3: noise('bandpass', 1400, 0.16, 0.8, 1.2, 3); break; // clap
-    case 4: tone(260, 190, 0.04, 0.08, 0.45, 'triangle'); noise('highpass', 2500, 0.12, 0.5); break; // snare 2
-    case 5: tom(82); break;
-    case 6: noise('highpass', 7500, 0.05, 0.4); break; // closed hat
-    case 7: tom(104); break;
-    case 8: noise('highpass', 7000, 0.09, 0.25); break; // pedal hat
-    case 9: tom(130); break;
-    case 10: noise('highpass', 7000, 0.4, 0.35); break; // open hat
-    case 11: tom(165); break;
+  switch (KIT[kitPad(note)].note) {
+    case 36: tone(150, 42, 0.12, 0.45, 1.0); tone(900, 200, 0.01, 0.02, 0.25, 'triangle'); break; // kick
+    case 37: tone(1700, 1600, 0.01, 0.03, 0.3, 'square'); noise('highpass', 2000, 0.02, 0.25); break; // rim
+    case 38: tone(220, 160, 0.05, 0.12, 0.5, 'triangle'); noise('highpass', 1200, 0.2, 0.55); break; // snare
+    case 39: noise('bandpass', 1400, 0.16, 0.8, 1.2, 3); break; // clap
+    case 40: tone(260, 190, 0.04, 0.08, 0.45, 'triangle'); noise('highpass', 2500, 0.12, 0.5); break; // snare 2
+    case 41: tom(82); break;
+    case 42: noise('highpass', 7500, 0.05, 0.4); break; // closed hat
+    case 43: tom(104); break;
+    case 44: noise('highpass', 7000, 0.09, 0.25); break; // pedal hat
+    case 45: tom(130); break;
+    case 46: noise('highpass', 7000, 0.4, 0.35); break; // open hat
+    case 47: tom(165); break;
+    case 49: noise('highpass', 4500, 1.4, 0.3); noise('bandpass', 7000, 0.6, 0.2, 0.8); break; // crash
+    case 51: tone(5100, 4900, 0.05, 0.9, 0.06, 'square'); noise('bandpass', 8500, 0.7, 0.2, 1.2); break; // ride
+    case 54: noise('highpass', 8500, 0.14, 0.4, 0.7, 2); tone(6500, 6400, 0.01, 0.06, 0.05, 'square'); break; // tambourine
+    case 56: tone(800, 790, 0.01, 0.28, 0.22, 'square'); tone(540, 535, 0.01, 0.28, 0.22, 'square'); break; // cowbell
   }
 
   let remaining = sources.length;

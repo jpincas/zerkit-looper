@@ -122,6 +122,16 @@ def strb_r(rt, rn, rm):                # strb rt, [rn, rm]
     return h(0x5400 | rm << 6 | rn << 3 | rt)
 
 
+def strh(rt, rn, imm=0):               # strh rt, [rn, #imm] (even, < 64)
+    assert rt < 8 and rn < 8 and imm % 2 == 0 and 0 <= imm < 64
+    return h(0x8000 | (imm // 2) << 6 | rn << 3 | rt)
+
+
+def adds_r(rd, rn, rm):                # adds rd, rn, rm
+    assert rd < 8 and rn < 8 and rm < 8
+    return h(0x1800 | rm << 6 | rn << 3 | rd)
+
+
 def subs_r(rd, rn, rm):                # subs rd, rn, rm
     assert rd < 8 and rn < 8 and rm < 8
     return h(0x1A00 | rm << 6 | rn << 3 | rd)

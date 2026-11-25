@@ -5,9 +5,13 @@ import { INSTRUMENTS, makeNoise } from './instruments.js';
 export class AudioOut {
   constructor(trackCount) {
     this.ctx = new AudioContext({ latencyHint: 'interactive' });
-    this.master = new GainNode(this.ctx, { gain: 0.6 });   // browser sounds only; see setSynthLevel
+    // Everything leaves through `out` (the master volume). Browser sounds go through `master`
+    // (their level, see setSynthLevel) and a compressor first; audio tracks go straight to `out`.
+    this.out = new GainNode(this.ctx, { gain: 1 });
+    this.out.connect(this.ctx.destination);
+    this.master = new GainNode(this.ctx, { gain: 0.6 });
     const comp = new DynamicsCompressorNode(this.ctx, { threshold: -14, ratio: 4 });
-    this.master.connect(comp).connect(this.ctx.destination);
+    this.master.connect(comp).connect(this.out);
     this.noise = makeNoise(this.ctx);
     this.instruments = Array(trackCount).fill('synth'); // keys of INSTRUMENTS
     // Mixer: each track plays into its own gain, set from volume, mute and solo.
@@ -15,7 +19,10 @@ export class AudioOut {
     this.mute = Array(trackCount).fill(false);
     this.solo = Array(trackCount).fill(false);
     this.bus = this.vol.map(() => new GainNode(this.ctx, { gain: 1 }));
-    this.bus.forEach(g => g.connect(this.master));
+    // Then a stereo position per track (-1 left .. 1 right; a balance control for stereo audio).
+    this.pan = Array(trackCount).fill(0);
+    this.panner = this.vol.map(() => new StereoPannerNode(this.ctx, { pan: 0 }));
+    this.bus.forEach((g, t) => g.connect(this.panner[t]).connect(this.master));
     this.live = new Map();      // "track:note" -> voice (keys held right now)
     this.scheduled = new Set(); // voices/clicks scheduled by the engine
   }
@@ -36,15 +43,23 @@ export class AudioOut {
     });
   }
 
+  setPan(t, v) {
+    this.pan[t] = Math.max(-1, Math.min(1, v));
+    this.panner[t].pan.setTargetAtTime(this.pan[t], this.now(), 0.015);
+  }
+
   // Level of the browser sounds (synths, drums, click), 0-1. Audio tracks don't pass through it.
   setSynthLevel(level) { this.master.gain.setTargetAtTime(1.2 * level * level, this.now(), 0.02); }
+
+  // Overall output level, 0-1, same curve as the track volumes (0.8 = unity).
+  setMasterVolume(v) { this.out.gain.setTargetAtTime((v * v) / 0.64, this.now(), 0.02); }
 
   // Synth tracks share the master stage (level and compressor, tuned for the browser sounds).
   // Audio tracks skip it and go straight out, so a loop plays back at the level it was recorded.
   route(track) {
-    const g = this.bus[track];
-    g.disconnect();
-    g.connect(INSTRUMENTS[this.instruments[track]].audio ? this.ctx.destination : this.master);
+    const p = this.panner[track];
+    p.disconnect();
+    p.connect(INSTRUMENTS[this.instruments[track]].audio ? this.out : this.master);
   }
 
   setInstrument(track, name) {

@@ -3,64 +3,78 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MIDI Looper</title>
+  <title>Zerkit Looper</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="app">
-    <header class="transport">
-      <div class="group">
-        <button id="play" class="btn" title="Play / Stop (Space)"><span class="icon">▶</span><kbd>Space</kbd></button>
-        <button id="rec" class="btn rec" title="Record (X)"><span class="dot"></span>Rec<kbd>X</kbd></button>
-        <button id="undo" class="btn" title="Undo last recording (Z)">Undo<kbd>Z</kbd></button>
-        <button id="clear" class="btn" title="Clear selected track (Backspace) · Shift: clear all">Clear<kbd>⌫</kbd></button>
-      </div>
-
-      <div class="group">
-        <button id="tempo-down" class="btn square" title="Tempo down (↓, Shift for 5)">−</button>
-        <div class="readout"><span id="bpm">120</span><small>BPM ↑↓</small></div>
-        <button id="tempo-up" class="btn square" title="Tempo up (↑, Shift for 5)">+</button>
-        <button id="click" class="btn toggle" title="Metronome (C)">Click<kbd>C</kbd></button>
-        <label class="level" title="Level of the browser sounds (synths, drums, click). Audio tracks aren't affected.">
-          <span>Synths</span><input id="synth-level" type="range" min="0" max="100" step="1">
-        </label>
-      </div>
-
-      <div class="group grow">
-        <div class="readout"><span id="pos">1.1</span><small>BAR.BEAT</small></div>
-        <div class="beats" id="beats"><i></i><i></i><i></i><i></i></div>
-        <div id="circuit" class="circuit">Circuit: …</div>
-        <div id="midi-in" class="circuit">MIDI in: …</div>
-        <div id="status" class="status">Stopped</div>
-      </div>
+    <!-- Status strip: what's happening, and what's connected -->
+    <header class="strip">
+      <div class="readout"><span id="pos">1.1</span><small>BAR.BEAT</small></div>
+      <div class="beats" id="beats"><i></i><i></i><i></i><i></i></div>
+      <div id="project" class="project" title="The current project (• = unsaved changes)">Untitled</div>
+      <div id="status" class="status">Stopped</div>
+      <div id="circuit" class="pill">Circuit: …</div>
+      <div id="midi-in" class="pill">MIDI in: …</div>
     </header>
 
     <div id="sound-gate" class="sound-gate" hidden>Sound is off: click anywhere on this page to turn it on. Browsers only allow sound after a click or key press on the page.</div>
 
-    <section class="trackbar" id="trackbar"></section>
-
-    <section class="seq" id="seq">
-      <div class="seq-head">
-        <div class="seq-title" id="seq-title">Track 1</div>
-        <select id="inst" class="inst" aria-label="Instrument for the selected track"></select>
-        <select id="input" class="inst" aria-label="Audio input for the selected track" hidden></select>
-        <span id="seq-len" class="seq-len"></span>
-      </div>
-      <canvas id="roll" class="roll"></canvas>
-    </section>
-
-    <section class="keys-area">
-      <div class="kb-side">
-        <div id="kb-track" class="kb-track">Track 1 · Synth</div>
-        <div class="group">
-          <button id="oct-down" class="btn square" title="Octave down (,)">−</button>
-          <div class="readout"><span id="oct">C4</span><small>OCTAVE , .</small></div>
-          <button id="oct-up" class="btn square" title="Octave up (.)">+</button>
+    <!-- The panel, laid out like the Circuit Tracks -->
+    <section class="device" id="device">
+      <div class="brand">
+        <div class="wordmark"><b>ZERKIT</b><span>LOOPER</span></div>
+        <div class="badge" aria-hidden="true">
+          <svg viewBox="0 0 100 50"><path d="M50 25C40 10 12 8 12 25C12 42 40 40 50 25C60 10 88 8 88 25C88 42 60 40 50 25Z"/></svg>
         </div>
       </div>
-      <div class="keyboard" id="keyboard"></div>
+      <div class="knob-cell master-vol" id="master-vol"></div>
+      <div class="knobs" id="knobs"></div>
+      <div class="knob-cell master-int" id="master-int"></div>
+
+      <!-- side buttons are placed into this grid by main.js -->
+      <div class="row8 aux" id="aux"></div>
+      <div class="row8 tracks" id="trackbar"></div>
+
+      <!-- Pages: the pad area shows the Looper, or the Presets or Kits page (Shift + Preset / Kits) -->
+      <div class="row8 pads mute-row page-looper" id="mute-row"></div>
+      <div class="row8 pads solo-row page-looper" id="solo-row"></div>
+      <div class="seq page-looper" id="seq">
+          <div class="seq-head">
+            <div class="seq-title" id="seq-title">Track 1</div>
+            <select id="inst" class="inst" aria-label="Instrument for the selected track"></select>
+            <select id="input" class="inst" aria-label="Audio input for the selected track" hidden></select>
+            <span id="oct" class="seq-oct" title="Keyboard octave (, .)">C4</span>
+            <span id="seq-len" class="seq-len"></span>
+          </div>
+          <div class="roll-wrap"><canvas id="roll" class="roll"></canvas></div>
+        </div>
+      <div class="page page-presets" id="page-presets" hidden>
+        <div class="page-head">
+          <h2>Presets</h2>
+          <p>Switch on the presets that Preset cycles through. (Saved with the project, once there are projects.)</p>
+        </div>
+        <div class="preset-list" id="preset-list"></div>
+      </div>
+      <div class="page page-kits" id="page-kits" hidden>
+        <div class="page-head"><h2>Kits</h2><p>Coming soon.</p></div>
+      </div>
+    </section>
+
+    <!-- Playing panel (Note): two-octave keyboard on synth tracks, 16-pad kit on drum tracks.
+         Its columns line up with the panel's. -->
+    <section class="keys-area">
+      <div class="kb-side"><b id="kb-track">Track 1</b><span id="kb-inst"></span><span id="kb-oct"></span></div>
+      <div class="kb-main">
+        <div class="keyboard" id="keyboard"></div>
+        <div class="kit" id="kit" hidden></div>
+        <div class="kb-audio" id="kb-audio" hidden>Audio tracks record their input: nothing to play here.</div>
+      </div>
     </section>
   </main>
+  <!-- Project screens (name box, Open list) and the notice that fades out after saving -->
+  <div id="dialog" class="dialog" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

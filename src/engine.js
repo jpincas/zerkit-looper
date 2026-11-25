@@ -60,6 +60,7 @@ export class Engine {
     this.dubStart = 0;      // beat the current overdub started at
     this.fresh = false;     // scheduling (re)starts: audio clips already mid-pass join part-way
     this.selected = 0;
+    this.swing = 50;        // % of an 8th where its second 16th falls: 50 = straight, 75 = full shuffle
     this.pass = 0;          // recording pass number, stamped on each note (for undo)
     this.held = new Map();  // "track:note" -> recorded note still waiting for its note-off
   }
@@ -121,6 +122,17 @@ export class Engine {
     this.out.cancelScheduled();
   }
 
+  setSwing(pct) { this.swing = Math.max(50, Math.min(75, Math.round(pct))); }
+
+  // Swing, applied as the loops play: within each 8th note the second 16th moves from halfway
+  // to `swing`% of the way, and everything in between stretches with it. Never earlier than
+  // written, so notes are never pushed back into time already scheduled.
+  swung(b) {
+    if (this.swing === 50) return b;
+    const cell = Math.floor(b * 2) / 2, p = b - cell, m = this.swing / 200;   // 8th = 0.5 beat
+    return cell + (p < 0.25 ? p * (m / 0.25) : m + (p - 0.25) * ((0.5 - m) / 0.25));
+  }
+
   setTempo(bpm) {
     if (this.hasAudio()) return;                     // recorded audio can't change speed
     bpm = Math.max(30, Math.min(300, Math.round(bpm)));
@@ -130,6 +142,14 @@ export class Engine {
       this.anchorTime = now;
     }
     this.bpm = bpm;
+  }
+
+  // Move a track's recorded notes by `semis`. Refused (false) if any would leave the MIDI range.
+  transpose(i, semis) {
+    const notes = this.tracks[i].notes;
+    if (!notes.length || notes.some(n => n.note + semis < 0 || n.note + semis > 127)) return false;
+    for (const n of notes) n.note += semis;
+    return true;
   }
 
   cycleQuant(i) {
@@ -376,7 +396,9 @@ export class Engine {
         if (n.dur == null) continue; // still held
         let k = Math.ceil((lo - origin - n.start) / L - 1e-9);
         for (let abs = origin + k * L + n.start; abs < to; k++, abs = origin + k * L + n.start) {
-          if (abs >= lo && !(abs < n.notBefore)) this.out.playNote(ti, n.note, n.vel, this.timeAt(abs), this.timeAt(abs + n.dur));
+          if (abs >= lo && !(abs < n.notBefore)) {
+            this.out.playNote(ti, n.note, n.vel, this.timeAt(this.swung(abs)), this.timeAt(this.swung(abs + n.dur)));
+          }
         }
       }
     });

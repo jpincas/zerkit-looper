@@ -1,9 +1,13 @@
 """Build LOOP04: LOOP3D (full input takeover) + the app controls every light.
 
-    .venv/bin/python build_lights.py incoming/circuittracks-firmware-4486.syx [--bright]
+    .venv/bin/python build_lights.py incoming/circuittracks-firmware-4486.syx [--bright | --splash]
 
 --bright builds LOOP05: LOOP04 plus `F0 7D 03 <led> <brightness 0-127> ... F7` for the knob
 LEDs 60-68 (127 = full; 0-126 scale the colour from 10% to 98%).
+
+--splash builds LOOP06: LOOP05 plus a splash screen. From power-on until the app's first
+F0 7D message, "LOOP" scrolls across the pads (so the Circuit doesn't look dead before the
+app connects). The first message ends it and clears the pads.
 
 Lights: the panel's 69 LEDs (0-31 pads, 32 + button id for buttons, 60-67 knobs, 68 master
 filter) are shown from our own 69-code frame in RAM; the stock painter never runs. Colours
@@ -59,8 +63,41 @@ def mov32(a, rd, value, comment=''):
 BRIGHT = RAM_SIG + 0x90
 FULL = 127                                    # 127 = full colour; 0-126 = 10%-98% (stock scaler)
 
+# Splash (LOOP06 only): three words after the brightness bytes: active flag, tick of the last
+# step, scroll position. The tick is the stock 1 ms counter (SysTick handler 0x0805998c).
+MARK6 = b'LOOP06'
+SIG6 = 0x364F4F50                             # 'POO6'
+SPLASH = RAM_SIG + 0x9C
+TICK = 0x20006A28
+STEP_MS = 110                                 # one column every 110 ms
+FONT = {'L': ['X..', 'X..', 'X..', 'XXX'],
+        'O': ['XXX', 'X.X', 'X.X', 'XXX'],
+        'P': ['XXX', 'X.X', 'XXX', 'X..']}
+SPLASH_COLOURS = [0x53, 0x45, 0x2D, 0x17]     # red, orange, yellow, green
+SPLASH_GAP = 6                                # blank columns after the word, before it repeats
 
-def lights_code(base, sig=SIG, bright=False):
+
+def splash_strip():
+    """The scrolling strip: 4 rows of W palette codes ("LOOP" + gap), one strip cycle."""
+    rows = [[] for _ in range(4)]
+    for k, (ch, colour) in enumerate(zip('LOOP', SPLASH_COLOURS)):
+        for r in range(4):
+            rows[r] += [colour if c == 'X' else 0 for c in FONT[ch][r]] + ([0] if k < 3 else [0] * SPLASH_GAP)
+    return rows
+
+
+SPLASH_W = len(splash_strip()[0])             # 21
+SPLASH_START = 15                             # first view: the gap, with L about to come in
+SPLASH_ROW = SPLASH_W + 7                     # stored row length: the strip + its first 7 columns again
+
+
+def splash_table():
+    """What c_splash reads: each row stored with its first 7 columns repeated after it, so the
+    8 columns seen at any position are contiguous."""
+    return bytes(sum(([*row, *row[:7]] for row in splash_strip()), []))
+
+
+def lights_code(base, sig=SIG, bright=False, splash=False, tab=0):
     a = T.Asm(base)
     br = lambda cond, lbl: (lambda at, L: T.b_cond(at, L[lbl], cond))
     bl_ = lambda lbl: (lambda at, L: T.bl(at, L[lbl]))
@@ -85,6 +122,11 @@ def lights_code(base, sig=SIG, bright=False):
         for _ in range(3):
             a('adds r3, #4', T.adds(3, 4))
             a('str r2, [r3]', T.str_(2, 3))
+    if splash:                                             # r3 = SPLASH - 4: flag 1, last tick 0, position
+        for value in (1, 0, SPLASH_START):
+            a('adds r3, #4', T.adds(3, 4))
+            a(f'movs r2, #{value}', T.movs(2, value))
+            a('str r2, [r3]', T.str_(2, 3))
     a.label('init_done')
     a('bx lr', T.bx_lr())
 
@@ -93,6 +135,8 @@ def lights_code(base, sig=SIG, bright=False):
     a('push {r4, lr}', T.push([4], lr=True))
     a('mov r4, r1', T.mov(4, 1))
     a('bl <c_init>', bl_('c_init'), 4)
+    if splash:
+        a('bl <c_splash>', bl_('c_splash'), 4)
     mov32(a, 3, FRAME)
     a('movs r0, #0', T.movs(0, 0))
     a.label('copy_loop')
@@ -116,6 +160,8 @@ def lights_code(base, sig=SIG, bright=False):
     a('ldr r4, [r1]', T.ldr(4, 1))                         # r4 = buf
     a('ldr r5, [r1, #4]', T.ldr(5, 1, 4))                  # r5 = len (F0 .. F7 inclusive)
     a('bl <c_init>', bl_('c_init'), 4)
+    if splash:
+        a('bl <c_unsplash>', bl_('c_unsplash'), 4)
     mov32(a, 6, FRAME)
     a('ldrb r0, [r4, #2]', T.ldrb(0, 4, 2))                # command
     a('cmp r0, #1', T.cmp(0, 1))
@@ -192,17 +238,84 @@ def lights_code(base, sig=SIG, bright=False):
         a.label('knob_full')
         mov32(a, 0, PALETTE_PTR)
         a('bx lr', T.bx_lr())
+    if splash:
+        # c_splash(): while the splash is on, step the scroll every STEP_MS and draw the 8
+        # columns at the scroll position into our frame's pads. Uses r0-r3 only.
+        a.label('c_splash')
+        mov32(a, 3, SPLASH)
+        a('ldr r0, [r3]', T.ldr(0, 3))
+        a('cmp r0, #0', T.cmp(0, 0))
+        a('bne <spl_on>', br('ne', 'spl_on'), 2)
+        a('bx lr', T.bx_lr())
+        a.label('spl_on')
+        mov32(a, 1, TICK)
+        a('ldr r1, [r1]', T.ldr(1, 1))
+        a('ldr r2, [r3, #4]', T.ldr(2, 3, 4))
+        a('subs r0, r1, r2', T.subs_r(0, 1, 2))
+        a(f'cmp r0, #{STEP_MS}', T.cmp(0, STEP_MS))
+        a('blo <spl_draw>', br('lo', 'spl_draw'), 2)
+        a('str r1, [r3, #4]', T.str_(1, 3, 4))
+        a('ldr r0, [r3, #8]', T.ldr(0, 3, 8))
+        a('adds r0, #1', T.adds(0, 1))
+        a('str r0, [r3, #8]', T.str_(0, 3, 8))
+        a.label('spl_draw')
+        a('ldr r0, [r3, #8]', T.ldr(0, 3, 8))
+        a(f'cmp r0, #{SPLASH_W}', T.cmp(0, SPLASH_W))
+        a('blo <spl_pos_ok>', br('lo', 'spl_pos_ok'), 2)
+        a('movs r0, #0', T.movs(0, 0))
+        a('str r0, [r3, #8]', T.str_(0, 3, 8))
+        a.label('spl_pos_ok')
+        mov32(a, 1, tab)                                   # the table (build puts it after the code)
+        a('adds r1, r1, r0', T.adds_r(1, 1, 0))
+        mov32(a, 2, FRAME)
+        for row in range(4):
+            for col in range(8):
+                at = lambda off: f', #{off}' if off else ''
+                a(f'ldrb r0, [r1{at(col)}]', T.ldrb(0, 1, col))
+                a(f'strh r0, [r2{at(2 * (8 * row + col))}]', T.strh(0, 2, 2 * (8 * row + col)))
+            if row < 3:
+                a(f'adds r1, #{SPLASH_ROW}', T.adds(1, SPLASH_ROW))
+        a('bx lr', T.bx_lr())
+
+        # c_unsplash(): the app has sent its first message: splash off, pads cleared. r0-r3 only.
+        a.label('c_unsplash')
+        mov32(a, 3, SPLASH)
+        a('ldr r0, [r3]', T.ldr(0, 3))
+        a('cmp r0, #0', T.cmp(0, 0))
+        a('bne <uns_on>', br('ne', 'uns_on'), 2)
+        a('bx lr', T.bx_lr())
+        a.label('uns_on')
+        a('movs r0, #0', T.movs(0, 0))
+        a('str r0, [r3]', T.str_(0, 3))
+        mov32(a, 3, FRAME)
+        a('movs r1, #16', T.movs(1, 16))                    # 16 words = the 32 pads
+        a.label('uns_loop')
+        a('str r0, [r3]', T.str_(0, 3))
+        a('adds r3, #4', T.adds(3, 4))
+        a('subs r1, #1', T.subs(1, 1))
+        a('bne <uns_loop>', br('ne', 'uns_loop'), 2)
+        a('bx lr', T.bx_lr())
     code, listing = a.assemble()
     return code, listing, a.labels
 
 
-def build(stock, bright=False):
+def mark(bright, splash):
+    return MARK6 if splash else MARK5 if bright else MARK
+
+
+def build(stock, bright=False, splash=False):
+    bright = bright or splash
     img, *_ = BT.build(stock, diag=True)                     # LOOP3D inputs, unchanged
     img = bytearray(img)
     base = fw.APP_BASE + ((len(img) + 3) & ~3)
     img += b'\xFF' * (base - fw.APP_BASE - len(img))
-    code, listing, labels = lights_code(base, SIG5 if bright else SIG, bright)
+    sig = SIG6 if splash else SIG5 if bright else SIG
+    code, listing, labels = lights_code(base, sig, bright, splash)
+    if splash:                                             # same size, now with the table's address
+        code, listing, labels = lights_code(base, sig, bright, splash, tab=base + len(code))
     img += code
+    if splash:
+        img += splash_table()
     for site in LED_CALLS:
         off = site - fw.APP_BASE
         assert bytes(img[off:off + 4]) == T.bl(site, LED_TASK), f'{site:#x}: not a bl to the LED task'
@@ -216,7 +329,7 @@ def build(stock, bright=False):
         lit = PALETTE_LIT - fw.APP_BASE
         assert int.from_bytes(img[lit:lit + 4], 'little') == PALETTE_PTR
         img[off:off + 4] = T.bl(KNOB_SITE, labels['c_knob'])
-    img[fw.VERSION_MARK:fw.VERSION_MARK + 6] = MARK5 if bright else MARK
+    img[fw.VERSION_MARK:fw.VERSION_MARK + 6] = mark(bright, splash)
     return bytes(img), base, listing, labels
 
 
@@ -243,7 +356,8 @@ def verify(img, base, listing, labels):
 if __name__ == '__main__':
     stock = fw.load_stock(sys.argv[1])
     bright = '--bright' in sys.argv                          # LOOP05
-    img, base, listing, labels = build(stock, bright)
+    splash = '--splash' in sys.argv                          # LOOP06
+    img, base, listing, labels = build(stock, bright, splash)
     for a, text in verify(img, base, listing, labels):
         print(f'  {a:#010x}  {text}')
     print('labels:', {k: hex(v) for k, v in labels.items() if k.startswith('c_')})
@@ -251,7 +365,7 @@ if __name__ == '__main__':
     sent = fw.decode(syx)
     assert sent[:len(img)] == img and set(sent[len(img):]) <= {0xFF}
     os.makedirs('build', exist_ok=True)
-    out = f'build/circuittracks-4486-{(MARK5 if bright else MARK).decode()}.syx'
+    out = f'build/circuittracks-4486-{mark(bright or splash, splash).decode()}.syx'
     open(out, 'wb').write(syx)
     open(out.replace('.syx', '.bin'), 'wb').write(sent)
     print(f'image {len(img):#x} (sent as {len(sent):#x}); wrote {out}  sha256 {fw.sha256(syx)}')

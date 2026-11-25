@@ -44,8 +44,8 @@
   <div class="panel">
     <h2>2. Choose what to install</h2>
     <div class="row">
-      <button id="pick-loop" class="primary" disabled>Install LOOP05 (takeover + lights + knob brightness)</button>
-      <button id="pick-loop4" disabled>Install LOOP04 (previous)</button>
+      <button id="pick-loop" class="primary" disabled>Install LOOP06 (takeover + lights + knob brightness + LOOP splash)</button>
+      <button id="pick-loop4" disabled>Install LOOP04 (known good)</button>
       <button id="pick-diag" disabled>Install LOOP3D (diagnostic)</button>
       <button id="pick-stock" disabled>Restore official 1.2.1</button>
     </div>
@@ -70,8 +70,8 @@
 <script>
 // Only these exact files can be sent (SHA-256 of the .syx).
 const FILES = {
-  loop: { url: '/circuit/build/circuittracks-4486-LOOP05.syx', name: 'LOOP05: full takeover + the app controls the lights and knob brightness',
-          sha: '55f39fb5f88b92d35e5d7477d397b44ba193cdb90777738efa6a015604d87640' },
+  loop: { url: '/circuit/build/circuittracks-4486-LOOP06.syx', name: 'LOOP06: full takeover + the app controls the lights and knob brightness; LOOP scrolls on the pads until the app connects',
+          sha: '562f9f39b37345a9f32adc86f7d407efbf1df4edb1fb797bc10ec01a957241bc' },
   loop4: { url: '/circuit/build/circuittracks-4486-LOOP04.syx', name: 'LOOP04: full takeover + the app controls the lights',
           sha: '29829f07170018848ae9ed59fb1cbc8cc029ac1b6439c72fb5b1d527c092fb5d' },
   diag: { url: '/circuit/build/circuittracks-4486-LOOP3D.syx', name: 'LOOP3D: diagnostic takeover (reports the MIDI gate after every message)',
