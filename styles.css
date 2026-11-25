@@ -358,6 +358,7 @@ body.shift .pbtn.has-shift .plabel, body.shift .pbtn.has-shift .phold { opacity:
 .tbtn .tnum { position: absolute; top: 6px; left: 9px; font: 600 18px ui-monospace, Menlo, monospace; color: var(--c); }
 .tbtn .tdot { position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: #2a2f39; }
 .tbtn .tdot.on { background: var(--c); box-shadow: 0 0 6px var(--c); }
+.tbtn .tfx { position: absolute; top: 6px; right: 22px; padding: 1px 4px; border-radius: 4px; font: 700 9px system-ui, sans-serif; letter-spacing: 0.06em; color: #10141a; background: #a58af5; }
 .tbtn .tinst { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .tbtn .tname { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tbtn .ticon { flex: none; display: block; width: 16px; height: 8px; color: var(--c); opacity: 0.9; --icon: var(--icon-keys); }
@@ -656,3 +657,55 @@ body.kb-open .keys-area { display: grid; }
 .ae-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
 .ae-row .ae-input { flex: 1; min-width: 0; color: var(--text); font-size: 13px; padding: 7px 8px; }
 .ae-row .me-ch { flex: none; width: auto; min-width: 0; color: var(--text); font-size: 13px; padding: 7px 8px; }
+
+/* ---- FX page: presets and bypass on top, then 8 pedals, one per pad column ---- */
+
+.fxp { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.fx-head { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); min-width: 0; }
+.fx-head b { color: var(--text); white-space: nowrap; }
+.fx-preset { color: var(--text); }
+.fx-hint { font-size: 11px; color: #5d6574; }
+/* Shift: the 32 presets on the pad grid, in place of everything else on the page */
+.fxp { position: relative; }
+.fx-grid { position: absolute; inset: 0; display: none; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(4, var(--sq)); gap: 10px; }
+.fxp.presets-shown .fx-grid { display: grid; }
+.fxp.presets-shown > :not(.fx-grid) { visibility: hidden; }
+.fx-pre {
+  position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; padding: 8px; min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--c) 35%, var(--line)); border-radius: 9px;
+  background: color-mix(in srgb, var(--c) 12%, var(--pad)); color: var(--text); font: 600 12px system-ui, sans-serif; text-align: left; cursor: pointer;
+}
+.fx-pre:hover { border-color: var(--c); }
+.fx-pre .card-num { position: absolute; top: 6px; left: 8px; font: 10px ui-monospace, Menlo, monospace; color: #5d6574; }
+.fx-pre .fx-kind { position: absolute; top: 6px; right: 8px; font: 700 9px system-ui, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c); }
+.fx-pre-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-pre.on { background: color-mix(in srgb, var(--c) 40%, var(--panel-2)); border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+.fx-bypass { margin-left: auto; padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; color: var(--go); white-space: nowrap; }
+.fx-bypass.off { color: var(--rec); border-color: #5a2a2a; }
+.fx-pedals { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; }
+.pedal {
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 4px;
+  padding: 8px 2px 10px; min-width: 0; min-height: 0;
+  border: 1px solid color-mix(in srgb, var(--c) 30%, var(--line)); border-radius: 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 14%, #1b1f27), #14171d);
+}
+.pedal-name { font: 800 10px system-ui, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--c) 70%, var(--text)); }
+.pk { gap: 1px; }
+.pk .dial { width: 30px; height: 30px; }
+.pk .dial i { top: 4px; height: 8px; transform-origin: 50% 11px; }
+.pk.pk-mix .dial { width: 42px; height: 42px; }
+.pk.pk-mix .dial i { top: 5px; height: 11px; transform-origin: 50% 16px; }
+.pk .klabel { font-size: 9px; letter-spacing: 0.04em; }
+.pk .kval { font: 10px ui-monospace, Menlo, monospace; color: var(--text); }
+.pk.held .dial { box-shadow: 0 0 0 2px var(--text); border-radius: 50%; }
+.pk.held .klabel { color: var(--text); }
+.pedal:not(.on) .pk { opacity: 0.45; }
+.pedal-led { width: 8px; height: 8px; border-radius: 50%; background: #3a2323; flex: none; }
+.pedal.on .pedal-led { background: #ff4b4b; box-shadow: 0 0 8px #ff4b4b; }
+.pedal-switch {
+  width: 34px; height: 34px; flex: none; border-radius: 50%;
+  border: 2px solid #4d5462; background: radial-gradient(circle at 40% 35%, #5d6574, #262b35 70%);
+  cursor: pointer; box-shadow: 0 3px 0 #0b0d11;
+}
+.pedal-switch:active { transform: translateY(2px); box-shadow: 0 1px 0 #0b0d11; }
+.pedal .pk { --c: inherit; }                        /* knob arcs in the pedal's colour */

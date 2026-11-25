@@ -117,6 +117,7 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Hold Tempo/Swing + turn the master filter knob | Tempo (with Shift held too: swing) |
 | Macro knob above each track / with Shift | That track's volume / left-right position |
 | Scales | Switch between track view and Note mode (and the play controls on screen) |
+| FX / Shift + FX | The selected track's 8 FX pedals (knob: a pedal's mix; hold pad 1-3 + knob: its controls; bottom pad: footswitch; Shift + pad: one of 32 presets) / bypass them |
 | Note / Shift + Note | The selected track's next MIDI instrument / MIDI page on and off |
 | 1-16/17-32 | Cycle the selected track's record quantise (its light: red off, amber 32nds, green 16ths) |
 | Save / Shift + Save | Save the project / save as |
@@ -202,6 +203,37 @@ with its own loop length, mute, solo, volume and undo. Recordings are shifted ba
 input's latency so they sit on the beat. Once a track holds audio the tempo is locked.
 Overdubbing (X on a track with a loop) adds a layer, which undo can take off again.
 
+## FX
+
+Every track has a pedalboard of 8 pedals in a row, between its volume and its left-right
+position, one per Circuit pad column:
+
+| Column | Pedal | Controls (hold pad 1 / 2 / 3 of the column and turn its knob) |
+| --- | --- | --- |
+| 1 | Comp | Threshold, Ratio, Makeup |
+| 2 | Drive | Drive, Tone, Level |
+| 3 | Filter | Cutoff, Resonance, Sweep (a half-note wobble) |
+| 4 | Chorus | Rate, Depth, Feedback |
+| 5 | Phaser | Rate, Depth, Feedback |
+| 6 | Tremolo | Rate (synced), Depth, Shape (sine or square) |
+| 7 | Delay | Time (synced; ping-pong), Feedback, Tone |
+| 8 | Reverb | Decay, Tone, Pre-delay |
+
+**FX** (the Circuit's FX button) opens the selected track's. On the Circuit, a column's knob on its
+own turns that pedal's **Mix**; hold pad 1, 2 or 3 of the column and turn it for that control;
+the column's bottom pad is the **footswitch**. Pads show each pedal's colour when it's on (a
+held pad white); knob lights show what each knob is turning. On screen each pedal is its Mix knob,
+three controls and a footswitch.
+
+**Presets:** hold **Shift** (on the Circuit, the Shift key, or on-screen Shift) and the pedals give way
+to 32 presets in a 4 x 8 grid lying on the pads; press one (pad n = preset n) to load it. One row
+per kind: Spaces (Dry, Room, Studio, Plate, Hall, Cathedral, Shimmer, Ambient), Echoes (Slapback,
+16ths, 8ths, Dotted, Quarters, Dub, Tape Echo, Ping-pong), Colour (Glue, Punch, Warm, Crunch, Fuzz,
+Lo-fi, Radio, Muffled), Movement (Chorus, Ensemble, Slow Phase, Fast Phase, Wobble, Tremolo,
+Stutter, Swirl). The loaded one is white. Turning a pedal's control switches it on. **⇧ Bypass** switches the track's FX off
+and on; a purple FX badge on the track shows when a pedal is on. A pedal's audio is only made the
+first time it's switched on. Each track's FX is saved with the project.
+
 ## MIDI tracks
 
 A **MIDI instrument** is an external instrument played over MIDI: a name, an **output** (a MIDI
@@ -219,7 +251,7 @@ audio instruments they're kept on this computer and projects remember their sett
 - `src/audio.js`: Web Audio implementation of `out`. It routes each track to its instrument and plays the click.
 - `src/instruments.js`: the synth voices and the kit pad layout; `src/audioinst.js` /
   `src/midiinst.js`: audio and MIDI instruments and their pages; `src/cards.js`: the square
-  cards every page uses.
+  cards every page uses; `src/fx.js` / `src/fxpage.js`: the per-track pedals, and the FX page.
 - `src/projects.js`: the projects folder and the project files; `src/session.js`: the current
   project (saving, opening, new) and its screens.
 - `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits

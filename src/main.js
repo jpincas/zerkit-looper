@@ -12,6 +12,8 @@ import { registerBuiltInKits } from './kits.js';
 import { setupAudioInstruments } from './audioinst.js';
 import { setupMidiInstruments } from './midiinst.js';
 import { cardPage, tracksUsing } from './cards.js';
+import { setupFxPage } from './fxpage.js';
+import { PEDALS } from './fx.js';
 
 const TRACKS = 8;
 const audio = new AudioOut(TRACKS);
@@ -267,7 +269,8 @@ for (const [row, col, key, def] of [
   [8, 1, 'patternSettings', { tap: 'Pattern Settings' }],
   [5, 10, 'audio', { tap: 'Audio', shift: 'List', act: e => (shifted(e) ? actions.togglePage('audio') : actions.nextAudio()),
     title: 'Tap: the selected track\'s next audio instrument (of those switched on in the Audio page). Shift: open the Audio page, or go back to the Looper' }],
-  [6, 10, 'fx', { tap: 'FX' }],
+  [6, 10, 'fx', { tap: 'FX', shift: 'Bypass', act: e => (shifted(e) ? fxPage.bypass() : actions.togglePage('fx')),
+    title: 'Tap: the selected track\'s FX, 8 pedals (on the Circuit: a column\'s knob turns its pedal\'s mix; hold pad 1-3 of the column and turn for its controls; the bottom pad is the footswitch). Shift: bypass its FX' }],
   [7, 10, 'record', { tap: 'Record', act: () => actions.record(), title: 'Record (X)' }],
   [8, 10, 'play', { tap: 'Play', act: () => actions.play(), title: 'Play / Stop (Space)' }],
 ]) {
@@ -284,7 +287,7 @@ btn.tempo.addEventListener('wheel', e => {
 // Track buttons, then mute and solo pads under each.
 const tbtns = [];
 for (let t = 0; t < TRACKS; t++) {
-  const b = el('button', 'tbtn', `<span class="tnum">${t + 1}</span><i class="tdot"></i><span class="tinst"><i class="ticon"></i><span class="tname"></span></span><span class="tlen"></span><b class="tq"></b>`);
+  const b = el('button', 'tbtn', `<span class="tnum">${t + 1}</span><i class="tdot"></i><span class="tinst"><i class="ticon"></i><span class="tname"></span></span><span class="tlen"></span><b class="tq"></b><b class="tfx">FX</b>`);
   b.title = `Track ${t + 1} (${t + 1})`;
   b.addEventListener('click', () => actions.select(t));
   $('trackbar').appendChild(b);
@@ -298,7 +301,7 @@ for (let t = 0; t < TRACKS; t++) {
   so.setAttribute('aria-label', so.title);
   so.addEventListener('click', () => actions.solo(t));
   $('solo-row').appendChild(so);
-  tbtns.push({ el: b, name: b.querySelector('.tname'), len: b.querySelector('.tlen'), dot: b.querySelector('.tdot'), q: b.querySelector('.tq'), m, s: so });
+  tbtns.push({ el: b, name: b.querySelector('.tname'), len: b.querySelector('.tlen'), dot: b.querySelector('.tdot'), q: b.querySelector('.tq'), fx: b.querySelector('.tfx'), m, s: so });
 }
 
 const instSelect = $('inst');
@@ -589,6 +592,10 @@ connectMidiKeyboards({
 // ---- pages ----------------------------------------------------------------------
 
 // Instruments page: a card per melodic instrument (tap: in or out of Instrument's cycle).
+// FX page: the selected track's pedalboard.
+const fxPage = setupFxPage({ root: $('page-fx'), audio, engine, trackName: t => inst(t).name,
+  shiftHeld: () => shiftDown(), consumeShift: () => { shiftLatch = false; } });
+
 const instrumentCards = cardPage($('page-presets'), {
   items: () => Object.keys(presetOn).map(key => ({ key, name: INSTRUMENTS[key].name, color: INSTRUMENTS[key].color })),
   isOn: key => presetOn[key],
@@ -605,6 +612,7 @@ function pageCards() {
     case 'kits': return kitPage.editing() ? null : kitPage.cards;
     case 'audio': return audioPage.editing() ? null : audioPage.cards;
     case 'midi': return midiPage.editing() ? null : midiPage.cards;
+    case 'fx': return fxPage.cards;
   }
   return null;
 }
@@ -615,6 +623,9 @@ function drawPage() {
   btn.kits.classList.toggle('page-on', page === 'kits');
   btn.audio.classList.toggle('page-on', page === 'audio');
   btn.midi.classList.toggle('page-on', page === 'midi');
+  btn.fx.classList.toggle('page-on', page === 'fx');
+  $('page-fx').hidden = page !== 'fx';
+  if (page === 'fx') fxPage.update();
   const midiShown = !$('page-midi').hidden;
   $('page-midi').hidden = page !== 'midi';
   if (page === 'midi') { if (!midiShown) midiPage.show(); midiPage.update(); }
@@ -662,6 +673,7 @@ function frame() {
 
   $('sound-gate').hidden = !soundBlocked();
   setText($('status'), status());
+  for (const f of audio.fx) f.setTempo(engine.bpm);        // delays follow the tempo
   document.body.dataset.rec = engine.rec;
   const beatIdx = engine.playing && b >= 0 ? Math.floor(b % bpb) : -1;
   beatDots.forEach((d, i) => d.classList.toggle('on', i === beatIdx));
@@ -707,6 +719,10 @@ function frame() {
     setText(tb.name, inst(t).name);
     tb.el.dataset.type = isAudio(t) ? 'audio' : isMidi(t) ? 'midi' : isDrums(t) ? 'kit' : 'inst';    // picks the icon by the name
     tb.q.dataset.q = engine.tracks[t].quant;
+    // FX: shown while a pedal is on (and the track's FX isn't bypassed)
+    const fx = audio.fx[t].settings, pedals = PEDALS.filter(p => fx.pedals[p.id].on).map(p => p.name);
+    tb.fx.hidden = !(fx.on && pedals.length);
+    tb.fx.title = pedals.length ? `FX: ${pedals.join(' + ')}${fx.on ? '' : ' (bypassed)'}` : '';
     setText(tb.q, { off: 'Q off', mid: 'Q 32', strong: 'Q 16' }[engine.tracks[t].quant]);
     setText(tb.len, len ? `${len} bar${len > 1 ? 's' : ''}` : '—');
   });
@@ -802,6 +818,10 @@ setInterval(() => {
 
 const app = {
   engine, audio, actions, press, release, noteFor, isDrums, isAudio, isMidi, soundBlocked, levels, kitPad, pageCards,
+  fxNudge: (k, d) => fxPage.nudge(k, d),
+  fxBypass: () => fxPage.bypass(),
+  fxCodes: () => fxPage.codes(),
+  fxValues: () => fxPage.values(),
   circuitShift: false,
   notePanel: () => notePanel,
   session,

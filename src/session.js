@@ -2,6 +2,7 @@
 // (a name box the first time you save, a "Saved" notice after that, and a list of recent projects).
 // Storage is in projects.js; this file turns the looper's state into a project and back.
 import { Projects, supported } from './projects.js';
+import { defaultFx, readFx } from './fx.js';
 
 const FORMAT = 'zerkit-project', VERSION = 1;
 
@@ -21,6 +22,7 @@ export function setupSession(ctx) {
       const out = {
         instrument, octave: octaves[t], quant: tr.quant,
         volume: audio.vol[t], pan: audio.pan[t], mute: audio.mute[t], solo: audio.solo[t],
+        fx: structuredClone(audio.fx[t].settings),
         loop: tr.loop ? { origin: tr.loop.origin, length: tr.loop.length } : null,
         notes: tr.notes.filter(n => n.dur != null).map(({ note, vel, start, dur, pass, kind }) => ({ note, vel, start, dur, pass, kind })),
       };
@@ -101,6 +103,7 @@ export function setupSession(ctx) {
       audio.mute[i] = !!t.mute;
       audio.solo[i] = !!t.solo;
       audio.setPan(i, t.pan ?? 0);
+      audio.fx[i].set(readFx(t.fx));                     // also reads the earlier delay + reverb FX
     });
     audio.mix();
     if (lost.size) setTimeout(() => toast(`Kit${lost.size > 1 ? 's' : ''} not found: ${[...lost].join(', ')} (using ${INSTRUMENTS[DEFAULT_KIT].name})`, 'warn'), 1400);
@@ -120,6 +123,7 @@ export function setupSession(ctx) {
       actions.instrument(i, inst);
       engine.tracks[i].quant = 'off';
       audio.vol[i] = 0.8; audio.mute[i] = false; audio.solo[i] = false; audio.setPan(i, 0);
+      audio.fx[i].set(defaultFx());
     });
     audio.mix();
     engine.pass = 0;
@@ -314,5 +318,9 @@ export function setupSession(ctx) {
     dialogOpen: () => !dialog.hidden,
     // Keys while a screen is up: Escape closes it, the screen handles the rest.
     key(e) { if (e.key === 'Escape') closeDialog(); else onKey?.(e); },
+    // From the Circuit: move up or down the list (or the screen's choices), and choose.
+    move(dir) { onKey?.({ key: dir < 0 ? 'ArrowUp' : 'ArrowDown' }); },
+    choose() { onKey?.({ key: 'Enter' }); },
+    close: closeDialog,
   };
 }

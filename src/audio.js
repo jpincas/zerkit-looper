@@ -1,6 +1,7 @@
 // Web Audio output: routes each track to its instrument (synth or drum rack)
 // and plays the metronome. Implements the `out` interface the Engine expects.
 import { INSTRUMENTS, makeNoise } from './instruments.js';
+import { TrackFX } from './fx.js';
 
 export class AudioOut {
   constructor(trackCount) {
@@ -22,7 +23,12 @@ export class AudioOut {
     // Then a stereo position per track (-1 left .. 1 right; a balance control for stereo audio).
     this.pan = Array(trackCount).fill(0);
     this.panner = this.vol.map(() => new StereoPannerNode(this.ctx, { pan: 0 }));
-    this.bus.forEach((g, t) => g.connect(this.panner[t]).connect(this.master));
+    // Between them, each track's FX (delay and reverb, see fx.js).
+    this.fx = this.vol.map(() => new TrackFX(this.ctx));
+    this.bus.forEach((g, t) => {
+      g.connect(this.fx[t].input);
+      this.fx[t].output.connect(this.panner[t]).connect(this.master);
+    });
     this.live = new Map();      // "track:note" -> voice (keys held right now)
     this.scheduled = new Set(); // voices/clicks scheduled by the engine
   }

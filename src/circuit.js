@@ -3,7 +3,7 @@
 import { isBlack } from './keys.js';
 import { INSTRUMENTS } from './instruments.js';
 
-const BTN = { preset: 8, note: 9, kits: 13, audio: 14, scales: 18, duplicate: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
+const BTN = { preset: 8, note: 9, kits: 13, audio: 14, fx: 15, scales: 18, duplicate: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
 const TRACK_BTNS = [0, 1, 2, 3, 4, 5, 6, 7];     // Synth 1-2, MIDI 1-2, Drum 1-4 -> tracks 1-8
 const N_LEDS = 69;
 const ledBtn = id => 32 + id;
@@ -56,8 +56,9 @@ export function connectCircuit(app) {
   // ---- input ---------------------------------------------------------------
   function onMidi(ev) {
     const [s, a, b] = ev.data;
+    if (app.session?.dialogOpen()) return dialogInput(s, a, b);
     if (s === 0x9E) return padDown(a, b);
-    if (s === 0x8E) return app.release(`circuit${a}`);
+    if (s === 0x8E) { app.pageCards()?.release?.(a); return app.release(`circuit${a}`); }
     if (s !== 0xBE || a === 100) return;              // 100 = firmware health report
     if (a >= 20 && a < 48) return b ? buttonDown(a - 20) : buttonUp(a - 20);
     if (a >= 1 && a <= 8) return knob(a - 1, b >= 64 ? b - 128 : b);
@@ -65,10 +66,31 @@ export function connectCircuit(app) {
     if (a === 9) return filterKnob(b);
   }
 
+  // A project screen is open (Open list, name box, "discard changes?"): only the master filter
+  // knob and Octave ▲ ▼ (move), Play (choose) and Projects (close) do anything.
+  let dialogTurn = 0;
+  function dialogInput(s, a, b) {
+    const session = app.session;
+    if (s === 0xBE && a === 9) {                           // master filter knob: a step per 2 positions
+      const d = lastFilter == null ? 0 : b - lastFilter;
+      lastFilter = b;
+      dialogTurn += d;
+      while (Math.abs(dialogTurn) >= 2) { session.move(Math.sign(dialogTurn)); dialogTurn -= 2 * Math.sign(dialogTurn); }
+      return;
+    }
+    if (s !== 0xBE || a < 20 || a >= 48 || !b) return;     // buttons, on press
+    switch (a - 20) {
+      case BTN.octUp: return session.move(-1);
+      case BTN.octDown: return session.move(1);
+      case BTN.play: return session.choose();
+      case BTN.open: return session.close();
+    }
+  }
+
   function padDown(p, vel) {
     audio.resume();
-    const cards = app.pageCards();                     // a page is open: pads 1-16 are its cards
-    if (cards) { if (p < 16) cards.toggleAt(p); return; }
+    const cards = app.pageCards();                     // a page is open: its pads (cards, or the FX pedals)
+    if (cards) { if (cards.press) cards.press(p); else if (p < 16) cards.toggleAt(p); return; }
     if (isNoteMode()) {
       const s = app.isDrums(engine.selected) ? kitPadAt(p) : noteModeSemitone(p);
       if (s != null) return app.press(`circuit${p}`, s, Math.max(1, vel));
@@ -94,6 +116,7 @@ export function connectCircuit(app) {
       case BTN.preset: return shift ? actions.togglePage('presets') : actions.nextInstrument(1);   // Shift: Instruments page
       case BTN.kits: return shift ? actions.togglePage('kits') : actions.nextKit();            // the Patterns button
       case BTN.audio: return shift ? actions.togglePage('audio') : actions.nextAudio();        // the Mixer button
+      case BTN.fx: return shift ? app.fxBypass() : actions.togglePage('fx');                   // the track's pedals / bypass
       case BTN.save: return shift ? app.session.saveAs() : app.session.save();
       case BTN.open: return shift ? app.session.newProject() : app.session.open();              // the Projects button
       case BTN.clear: return shift ? actions.redo() : actions.undo();
@@ -111,6 +134,7 @@ export function connectCircuit(app) {
   }
 
   function knob(k, delta) {
+    if (app.page() === 'fx') return app.fxNudge(k, delta);   // FX page: the 8 pedal controls
     if (shift) return actions.pan(k, delta * 0.03);  // Shift: that track's left-right position
     actions.volume(k, delta * 0.02);                 // knob above each track = its volume
   }
@@ -132,6 +156,13 @@ export function connectCircuit(app) {
   // ---- lights ----------------------------------------------------------------
   function frame() {
     const f = new Array(N_LEDS).fill(C.off);
+    if (app.session?.dialogOpen()) {                       // a project screen: just its controls
+      f[ledBtn(BTN.octUp)] = f[ledBtn(BTN.octDown)] = C.white;
+      f[ledBtn(BTN.play)] = C.green;
+      f[ledBtn(BTN.open)] = C.dim;
+      f[KNOB_LED + 8] = C.white;                            // the master filter knob
+      return f;
+    }
     const sel = engine.selected;
     const b = engine.beat();
     const blink = Math.floor(performance.now() / 250) % 2 === 0;
@@ -142,6 +173,7 @@ export function connectCircuit(app) {
     f[ledBtn(BTN.preset)] = app.page() === 'presets' ? C.white : instCode(sel);
     f[ledBtn(BTN.kits)] = app.page() === 'kits' ? C.white : C.dim;
     f[ledBtn(BTN.audio)] = app.page() === 'audio' ? C.white : C.dim;
+    f[ledBtn(BTN.fx)] = app.page() === 'fx' ? C.white : C.dim;
     f[ledBtn(BTN.save)] = projectDirty ? C.white : C.dim;                 // white: unsaved changes
     f[ledBtn(BTN.open)] = C.dim;
     f[ledBtn(BTN.scales)] = isNoteMode() ? C.white : C.dim;
@@ -165,7 +197,8 @@ export function connectCircuit(app) {
     // Knobs: the track's colour (brightness = volume, sent separately). The filter knob lights
     // while Tempo is held, when it sets the tempo (white) or, with Shift, the swing (amber).
     for (let t = 0; t < 8; t++) {
-      f[KNOB_LED + t] = audio.vol[t] > 0 ? instCode(t) : C.off;
+      f[KNOB_LED + t] = app.page() === 'fx' ? app.fxCodes()[t]                // FX page: each pedal's colour
+        : audio.vol[t] > 0 ? instCode(t) : C.off;
     }
     f[KNOB_LED + 8] = tempoHeld ? (shift ? C.amber : C.white) : C.off;
 
@@ -199,7 +232,7 @@ export function connectCircuit(app) {
   // A page's cards on pads 1-16: the instrument's colour when switched on, dim when off, white
   // for the selected track's own.
   function pageLights(f, cards) {
-    cards.state().forEach((c, i) => { f[i] = c.current ? C.white : c.on ? codeFor(c.key) : C.dim; });
+    cards.state().forEach((c, i) => { if (c) f[i] = c.current ? C.white : c.on ? (c.code ?? codeFor(c.key)) : C.dim; });
   }
 
   function mixLights(f) {
@@ -237,7 +270,9 @@ export function connectCircuit(app) {
 
   function sendBrightness() {
     if (!out) return;
-    const b = [...audio.vol.map(brightFor), 127];   // knobs 1-8, then the filter knob
+    const b = app.page() === 'fx'
+      ? [...app.fxValues().map(v => Math.round(v * 126)), 127]   // FX page: each control's value
+      : [...audio.vol.map(brightFor), 127];                      // knobs 1-8, then the filter knob
     const key = b.join(',');
     if (key === lastBright) return;
     lastBright = key;
