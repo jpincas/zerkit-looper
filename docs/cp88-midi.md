@@ -61,7 +61,7 @@ to **external** instruments. It doesn't change how the CP88's own sections recei
 Firmware 2.00 adds **Section SW Mode** ([MENU] → Control Panel → Advanced Settings). With it set
 to **Next-Key** and **MIDI Control = On**, switching a section on or off by CC only affects
 notes that start afterwards. Notes already sounding keep the section they started on. That
-holds for notes received over MIDI too: in the routing test (`monitor.html`), three chords sent
+holds for notes received over MIDI too: in a routing test, three chords sent
 after switching to Piano, E.Piano and Sub in turn were held together and sounded as three
 different sounds, layered.
 

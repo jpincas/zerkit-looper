@@ -60,7 +60,7 @@ The page is laid out like the Circuit Tracks. Top to bottom:
 - **Row above the tracks:** Play/Hide (the play controls; the Circuit's Scales button) | Octave ▼ ▲ (Shift: move the selected track's notes an octave), Q (cycles the selected track's record
   quantise; each track button shows its own: Q off, Q 32, Q 16), Tempo (tap: click; hold + filter knob or scroll: tempo;
   Shift: swing; shows tempo · swing), Clear track, Undo (Shift: redo), Save (Shift: save a
-  template), Open (Shift: a new project from a template) | Shift (holds for the next press).
+  template), Open (Shift: new project) | Shift (holds for the next press).
 - **Track row:** Instrument (tap: the selected track's next melodic instrument, of those switched
   on; Shift: the Instruments page) | the eight track buttons | Jam, track "0" in dark grey (tap or
   `0`: deselect every track, see below). A small icon by each track's name shows its type: keyboard
@@ -134,7 +134,7 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | FX / Shift + FX | The selected track's 8 FX pedals (knob: a pedal's mix; hold pad 1-3 + knob: its controls; bottom pad: footswitch; Shift + pad: one of 32 presets) / bypass them |
 | 1-16/17-32 | Cycle the selected track's record quantise (its light: red off, amber 32nds, green 16ths) |
 | Save / Shift + Save | Save the project / save a template |
-| Projects / Shift + Projects | Open a recent project / a new project from a template (both on screen) |
+| Projects / Shift + Projects | Open a recent project / new project (both on screen; Play picks) |
 | Mixer | Settings on and off (track buttons: its page; Octave ▲ ▼ or the master filter knob: choose; Play: pick; Clear: delete) |
 | Master volume knob | Master volume |
 | Master filter knob | Click level (hold Tempo: tempo; Shift too: swing) |
@@ -165,16 +165,30 @@ them live exactly as played; the loop plays them on the grid from the next pass.
 
 **Save** (⌘S) the first time asks for a name, then saves straight away every time after, with a
 brief "Saved" notice. ⇧⌘S saves under a new name. **Open** (⌘O) lists recent projects, newest
-first (↑ ↓ and Enter, or click). Opening warns first if there are unsaved changes. The current
+first (↑ ↓ and Enter, or click). Opening warns first if there are unsaved changes. The looper
+reopens the last project you saved or opened (as last saved) when the page loads. If Chrome wants
+a click before it lets the page back into the projects folder, the notice at the bottom says so
+and the first click reopens it. Starting a new project forgets it. The current
 project's name is in the logo row, with • while there are unsaved changes (Save's border
 brightens, and its light on the Circuit is white).
 
 **Templates** are a project's setup without its recordings: tempo, swing, each track's sound,
 octave, quantise, mix, FX and synth, and which instruments each button cycles through.
-**⇧ Save** keeps the current setup as a template under a name. **⇧ Open** starts a new project
-from one, or from the stock setup; the list starts on the default. One template can be the
+**⇧ Save** keeps the current setup as a template under a name. **⇧ Open** is New project: it
+lists the stock setup and your templates, starting on the default, so ⇧ Open then Play (or
+Enter) starts a new project. With unsaved changes it first asks: Save current (chosen to start with;
+a project never saved asks for a name) or Continue without saving. One template can be the
 **default**: the looper starts with it when it loads. Without one, it's the stock setup.
 Templates are kept in this browser, so they're there straight away.
+
+## The guide
+
+A click-through of the panel in 20 short steps: each opens what it's about (the Instruments list,
+the keyboard, FX, the synth, Jam, Settings), dims the rest, outlines the part and says what it does,
+and which Circuit button does it. Next and Back (→ ←, Enter), Esc or ✕ to close, which puts the
+screen back as it was; nothing in the project is changed. It shows on startup, carrying on from the
+step you reached, until you finish it or tick "Don't show on startup"; Settings › Guide starts it
+again. Kept in this browser.
 
 ## Settings
 
@@ -185,6 +199,23 @@ on the second press. On the Circuit each row is also a pad (amber: the default).
 
 - **Templates** (track 1): the stock setup and your templates. Play makes the chosen one the
   default (again: back to the stock setup).
+- **MIDI** (track 2): which MIDI input plays the selected track, like the computer keyboard or
+  the Circuit's pads: all inputs or one (row 1), on every channel (Omni, row 2) or one (rows
+  3–4: 1–16). Laid out like the pads, so on the Circuit a pad picks it. Kept in this browser.
+  A MIDI instrument with its own keyboard still hears that keyboard whatever's picked here.
+- **Firmware** (track 3): puts the looper's firmware (LOOP06) on the Circuit, or Novation's
+  official 1.2.1 back. Screen only: start the Circuit in recovery mode (Scales + Preset + Note
+  held while switching on), Check Circuit, pick one, Send, then press Play on the Circuit when
+  asked. Needs the firmware files from `circuit/` on the computer serving the looper.
+- **Monitor** (track 4): every MIDI message coming in, newest first, the Circuit's controls
+  included. Ones the looper doesn't play are dimmed, with why (e.g. not the MIDI input or
+  channel picked). Clear track empties it.
+- **Guide** (track 5): start the guide over, continue it from where you left it, and whether it
+  shows on startup.
+
+The address keeps what's on screen: the selected track, the open page and the play controls
+(`#3/fx`, `#1/settings/midi`, `#0` for Jam, `/keys` with the play controls shown), so a refresh
+comes back to the same view.
 
 Projects live in a folder on your computer, chosen the first time you save (Chrome asks for
 permission to use it; choose "Allow on every visit", or it asks again after a reload). Each
@@ -337,7 +368,8 @@ audio instruments they're kept on this computer and projects remember their sett
   `src/synthpage.js`: the per-track synth, and the Synth page.
 - `src/projects.js`: the projects folder and the project files; `src/session.js`: the current
   project (saving, opening, new, templates) and its screens; `src/templates.js`: template
-  storage; `src/settings.js`: the Settings pages.
+  storage; `src/settings.js`: the Settings pages (`src/firmware.js`: Firmware, `src/monitor.js`: Monitor,
+  `src/tour.js`: the guide).
 - `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits
   page and kit editor.
 - `kits/`: the built-in kits; `tools/build_kits.py` builds them. `instruments/`: the built-in

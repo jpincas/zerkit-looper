@@ -15,6 +15,10 @@ export function setupSession(ctx) {
   let name = null;             // the current project's name (null: never saved)
   let savedKey = null;         // what it looked like when last saved or opened, to tell if it's changed
   let busy = false;
+  // The project last saved or opened, reopened when the page loads (a new project forgets it).
+  const LAST = 'lastProject';
+  const remember = n => { try { if (n) localStorage.setItem(LAST, n); else localStorage.removeItem(LAST); } catch {} };
+  let reopen = null;           // that project, while it waits for a click to allow the folder again
 
   // ---- the looper's state <-> a project ----------------------------------------
 
@@ -161,27 +165,32 @@ export function setupSession(ctx) {
     try { return await store.allow(); } catch { return false; }   // picker cancelled
   }
 
+  // Save under `n`; true once saved.
   async function write(n) {
-    if (busy) return;
+    if (busy) return false;
     busy = true;
     try {
-      if (!(await ensureAccess())) return;
+      if (!(await ensureAccess())) return false;
       const { json, audioFiles } = snapshot();
       const missing = json.tracks.some(t => (t.clips ?? []).some(c => !audioFiles.has(c.file)));
-      if (missing) { toast('Still recording audio: try again in a moment', 'warn'); return; }
+      if (missing) { toast('Still recording audio: try again in a moment', 'warn'); return false; }
       const key = keyOf(json);
       await store.save(n, { ...json, savedAt: Date.now(), summary: summary(json) }, audioFiles);
       name = n;
       savedKey = key;
+      remember(n);
       toast(`Saved · ${n}`);
+      return true;
     } catch (err) {
       console.error(err);
       toast(`Couldn't save: ${err.message}`, 'warn');
+      return false;
     } finally {
       busy = false;
     }
   }
 
+  // Open project `n`; true once open.
   async function openProject(n) {
     try {
       const { json, audio: loadAudio } = await store.load(n, audio.ctx);
@@ -189,12 +198,41 @@ export function setupSession(ctx) {
       await restore(json, loadAudio);
       name = n;
       savedKey = keyOf(snapshot().json);
+      remember(n);
       closeDialog();
       toast(`Opened · ${n}`);
+      return true;
     } catch (err) {
       console.error(err);
       toast(`Couldn't open “${n}”: ${err.message}`, 'warn');
+      return false;
     }
+  }
+
+  // When the page loads: the last project, as last saved. Chrome lets the page back into the
+  // projects folder only after a click or key press on it (unless "Allow on every visit"), so
+  // then the first one reopens it; until then (or with no last project) the default template.
+  async function startup() {
+    let last = null;
+    try { last = localStorage.getItem(LAST); } catch {}
+    const state = last ? await store.access() : 'none';
+    if (state === 'granted') {
+      if ((await store.exists(last)) && (await openProject(last))) return;
+      remember(null);
+    } else if (state === 'prompt') {
+      reopen = last;
+      const go = async () => {
+        window.removeEventListener('pointerdown', go, true);
+        window.removeEventListener('keydown', go, true);
+        const n = reopen;
+        reopen = null;
+        try { if ((await store.allow()) && (await store.exists(n))) await openProject(n); } catch {}
+      };
+      window.addEventListener('pointerdown', go, true);
+      window.addEventListener('keydown', go, true);
+    }
+    const d = templates.defaultName();
+    if (d) await fromTemplate(d, true);
   }
 
   // ---- screens -------------------------------------------------------------------
@@ -221,11 +259,12 @@ export function setupSession(ctx) {
     toastTimer = setTimeout(() => (t.className = `toast ${kind}`), kind === 'ok' ? 1300 : 3200);
   }
 
-  // Name box: the first save, Save As, and Save template (`exists`, `save` and `note` for those).
+  // Name box: the first save, Save As, and Save template (`exists`, `save` and `note` for those;
+  // `after`: what to do once a project is saved).
   function nameBox(title, initial, kind = {}) {
     const folder = store.folderName;
     const exists = kind.exists ?? (async n => n !== name && (await store.access()) === 'granted' && store.exists(n));
-    const save = kind.save ?? write;
+    const save = kind.save ?? (async n => { if ((await write(n)) && kind.after) kind.after(); });
     showDialog(`
       <h3>${title}</h3>
       <input class="dlg-name" id="dlg-name" maxlength="80" spellcheck="false" value="${esc(initial)}">
@@ -314,16 +353,25 @@ export function setupSession(ctx) {
     };
   }
 
-  function confirmNew() {
-    showDialog(`<h3>New project</h3><p class="dlg-note warn">${name ? `“${esc(name)}” has` : 'This project has'} unsaved changes. Start a new one anyway?</p>
-      <div class="dlg-actions"><button class="dlg-btn" data-act="cancel">Cancel</button><button class="dlg-btn primary" data-act="new">Discard and start new</button></div>`,
-      e => { if (e.key === 'Enter') go(); });
-    const go = () => { closeDialog(); startNew(); };
-    dialog.querySelector('[data-act=new]').onclick = go;
-    dialog.querySelector('[data-act=cancel]').onclick = closeDialog;
+  // Unsaved changes: Save current (chosen to start with) or Continue without saving, then `next`.
+  function saveFirst(next) {
+    const choices = [
+      { label: 'Save current', go: () => (name ? write(name).then(ok => ok && next()) : nameBox('Save project', stamp(), { after: next })) },
+      { label: 'Continue without saving', go: next },
+    ];
+    showDialog(`<h3>${name ? `“${esc(name)}”` : 'This project'} has unsaved changes</h3>
+      <div class="dlg-list">${choices.map((c, i) => `<button class="dlg-item" data-i="${i}"><span class="di-name">${c.label}</span></button>`).join('')}</div>`);
+    const els = [...dialog.querySelectorAll('.dlg-item')];
+    let sel = 0;
+    const mark = () => els.forEach((r, i) => r.classList.toggle('sel', i === sel));
+    const pick = i => { closeDialog(); choices[i].go(); };
+    mark();
+    els.forEach((r, i) => { r.onclick = () => pick(i); r.onmouseenter = () => { sel = i; mark(); }; });
+    onKey = e => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { sel = e.key === 'ArrowDown' ? 1 : 0; mark(); }
+      if (e.key === 'Enter') pick(sel);
+    };
   }
-  // A new project: the default template's setup, or the stock one.
-  function startNew(template = templates.defaultName()) { return fromTemplate(template); }
 
   // A new, unnamed project with a template's setup (null: the stock setup).
   async function fromTemplate(tname, quiet = false) {
@@ -339,7 +387,7 @@ export function setupSession(ctx) {
     name = null;
     savedKey = keyOf(snapshot().json);
     closeDialog();
-    if (!quiet) toast(t ? `New project · ${t.name}` : 'New project');
+    if (!quiet) { remember(null); toast(t ? `New project · ${t.name}` : 'New project'); }
   }
 
   // Save template: the setup under a name of your choice (the last one used to start with).
@@ -360,9 +408,7 @@ export function setupSession(ctx) {
   function openTemplateList() {
     const list = templates.list(), dflt = templates.defaultName();
     const rows = [{ name: null, label: 'Stock setup', when: 'built in' }, ...list.map(t => ({ name: t.name, label: t.name, when: ago(t.savedAt), json: t.json }))];
-    const dirty = isDirty() && !engine.isEmpty();
-    showDialog(`<h3>New project from a template</h3>
-      ${dirty ? `<p class="dlg-note warn">${name ? `“${esc(name)}” has` : 'This project has'} unsaved changes. Starting a new one discards them.</p>` : ''}
+    showDialog(`<h3>New project</h3>
       <div class="dlg-list" id="dlg-list">${rows.map((r, i) => {
         const json = r.json, tracks = json ? json.tracks.map(t => INSTRUMENTS[t.instrument]?.color ?? '#888') : DEFAULTS.map(k => INSTRUMENTS[k]?.color ?? '#888');
         return `<button class="dlg-item${r.name === dflt ? ' current' : ''}" data-i="${i}">
@@ -398,11 +444,12 @@ export function setupSession(ctx) {
     save() { if (name) write(name); else nameBox('Save project', stamp()); },
     saveAs() { nameBox('Save as', name ? `${name} copy` : stamp()); },
     open() { if (dialog.hidden) openList(); else closeDialog(); },
-    newProject() { if (isDirty() && !engine.isEmpty()) confirmNew(); else startNew(); },
     saveTemplate,
-    openTemplate() { if (dialog.hidden) openTemplateList(); else closeDialog(); },
+    // New project: save first if there are unsaved changes, then pick what to start from.
+    openTemplate() { if (!dialog.hidden) closeDialog(); else if (isDirty()) saveFirst(openTemplateList); else openTemplateList(); },
     // When the page opens: the default template's setup, if there is one.
-    async startup() { const d = templates.defaultName(); if (d) await fromTemplate(d, true); },
+    startup,
+    reopening: () => reopen,     // the last project's name while it waits for a click
     name: () => name,
     dirty: isDirty,
     dialogOpen: () => !dialog.hidden,

@@ -45,8 +45,7 @@ master filter 68. Some button LEDs are single-colour (white), so any non-zero co
 
 Colours are Novation palette codes 0–127, for example 0 off, 0x01 white, 0x09 blue,
 0x13 light blue, 0x17 green, 0x2D yellow, 0x32 magenta, 0x45 orange, 0x53 red, 0x54 dim red.
-Some codes are animated (flash or pulse) by the firmware. Use Palette mode in `lights.html` to
-see every code on the device.
+Some codes are animated (flash or pulse) by the firmware.
 
 Knob brightness uses the stock firmware's own scaler (0x080475a6), which it normally uses
 to show parameter values on the knobs. Brightness starts at 127 (full) for every knob. LOOP04
@@ -63,8 +62,10 @@ Circuit showing LOOP is running and waiting for the app.
 
 - `circuit/build_lights.py` builds LOOP04 (LOOP05 with `--bright`, LOOP06 with `--splash`) from Novation's official 1.2.1 file, which `circuit/fw.py`
   checks by SHA-256. `circuit/test_*.py` run the patched code in an ARM emulator.
-- `flash.html` sends allow-listed builds to the Circuit in recovery mode. Recovery mode is
-  **Scales + Preset + Note** held at power-on, and it also restores the official firmware.
+- Settings › Firmware (`src/firmware.js`) sends allow-listed builds to the Circuit in recovery
+  mode, and restores the official firmware. Recovery mode is **Scales + Preset + Note** held at
+  power-on. It needs the builds in `circuit/build/` and Novation's file in `circuit/incoming/`,
+  which aren't in git.
 - The patch technique and firmware addresses come from the community project
   [CIRCUIT-HACKS-RC](https://github.com/Ghillermo/CIRCUIT-HACKS-RC) (MIT).
 - Known issue: LOOP02, which sent through the stock gated sender, once had the stock MIDI gate

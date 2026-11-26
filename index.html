@@ -8,7 +8,6 @@
 </head>
 <body>
   <main class="app">
-    <div id="sound-gate" class="sound-gate" hidden>Sound is off: click anywhere on this page to turn it on. Browsers only allow sound after a click or key press on the page.</div>
 
     <!-- The panel, laid out like the Circuit Tracks -->
     <section class="device" id="device">
@@ -69,6 +68,8 @@
   <!-- Project screens (name box, Open list) and the notice that fades out after saving -->
   <div id="dialog" class="dialog" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <!-- Browsers keep sound off until a click or key press on the page -->
+  <div id="sound-gate" class="sound-gate" hidden>Click anywhere to turn the sound on</div>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

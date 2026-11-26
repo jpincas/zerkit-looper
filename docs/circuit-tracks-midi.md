@@ -1,6 +1,6 @@
 # Novation Circuit Tracks: what it sends over MIDI
 
-Mapped on 2026-11-24 with the Circuit plugged into a Mac over USB-C, using `monitor.html`,
+Mapped on 2026-11-24 with the Circuit plugged into a Mac over USB-C, using a MIDI monitor page (now Settings › Monitor),
 with the Circuit on its default settings.
 
 The port shows up as **"Circuit Tracks MIDI"** (manufacturer "Focusrite A.E"), both input and output.

@@ -60,6 +60,7 @@ export function connectCircuit(app) {
 
   // ---- input ---------------------------------------------------------------
   function onMidi(ev) {
+    if (app.flashing) return;                         // Settings › Firmware has the Circuit
     const [s, a, b] = ev.data;
     if (app.session?.dialogOpen()) return dialogInput(s, a, b);
     if (s === 0x9E) return padDown(a, b);
@@ -315,7 +316,7 @@ export function connectCircuit(app) {
   }
 
   function sendFrame() {
-    if (!out) return;
+    if (!out || app.flashing) { lastFrame = ''; return; }     // flashing: leave it alone, resend after
     const f = frame();
     const key = f.join(',');
     if (key === lastFrame) return;
@@ -324,7 +325,7 @@ export function connectCircuit(app) {
   }
 
   function sendBrightness() {
-    if (!out) return;
+    if (!out || app.flashing) { lastBright = ''; return; }
     const controls = app.pageControls?.();
     const b = controls ? [...controls.values(), 127]
       : app.knobPage()

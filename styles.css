@@ -1,5 +1,6 @@
 :root {
-  --bg: #0b0d11;
+  --page: #6f7072;          /* round the panel: a neutral mid grey */
+  --bg: #0b0d11;            /* insets inside the panel */
   --body: #15181e;          /* the panel's face */
   --panel-2: #1f232c;       /* buttons */
   --pad: #22262f;
@@ -16,10 +17,14 @@
 body.kb-open { --kb-h: 162px; }               /* the playing panel's height + gap (see .app) */
 [hidden] { display: none !important; }
 
-html, body { height: 100%; margin: 0; }
+html, body { min-height: 100%; margin: 0; }
+html { height: 100%; }
 
+/* The looper sits in the middle of the window, both ways (scrolling if the window is too small). */
 body {
-  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
   color: var(--text);
   font: 14px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
   user-select: none;
@@ -36,8 +41,9 @@ body {
   flex-direction: column;
   gap: 12px;
   padding: 16px;
+  width: 100%;
   max-width: min(1180px, max(980px, calc((100vh - 400px - var(--kb-h, 0px)) * 1.6 + 364px)));
-  margin: 0 auto;
+  margin: auto;
 }
 
 /* ---- transport, in the sequencer's header: status, bar.beat, beat dots ---- */
@@ -53,7 +59,16 @@ body[data-rec="overdub"] .status { color: var(--accent); }
 .beats i.on { background: var(--text); }
 .beats i.on:first-child { background: var(--accent); }
 
+body:not(.ready) .app { visibility: hidden; }     /* until main.js has built the panel: no layout shift */
+/* Floats over the page (bottom centre), so showing and hiding it moves nothing. */
 .sound-gate {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 25;
+  max-width: calc(100% - 32px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   padding: 10px 14px;
   border: 1px solid #6b5420;
   border-radius: 10px;
@@ -648,6 +663,7 @@ body.kb-open .keys-area { display: grid; }
 .toast.ok::before { content: "✓  "; color: var(--go); }
 .toast.warn { background: #332a14; border-color: #6b5420; color: var(--accent); }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+body.gated .toast { bottom: 72px; }                  /* above the sound notice */
 
 /* ---- Kits page: kit cards and the kit editor ---- */
 
@@ -822,3 +838,68 @@ body[data-page="settings"] .tbtn.setpage .tnum, body[data-page="settings"] .tbtn
 .sr-btn:hover { border-color: #464d5c; color: var(--text); }
 .set-row.dflt .sr-default { border-color: #6b5420; color: var(--accent); }
 .sr-del.armed { border-color: var(--rec); background: color-mix(in srgb, var(--rec) 20%, transparent); color: var(--text); }
+
+/* Settings › MIDI: laid out like the pads (inputs, Omni, channels 1-16) */
+.set-pads { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(4, var(--sq)); gap: 10px; }
+.set-pad { --c: var(--accent); font: inherit; text-align: left; }
+.set-pad.ch .card-name { font: 600 18px ui-monospace, Menlo, monospace; }
+.set-pad.sel { border-color: #c9ced8; box-shadow: 0 0 0 1px #c9ced8; }
+.set-pad.gone .card-name { text-decoration: line-through; }
+.set-pad .card-name { white-space: normal; }
+
+/* Settings › Firmware */
+.fw-row { display: flex; align-items: center; gap: 12px; }
+.fw-dev { font-size: 13px; color: var(--muted); }
+.fw-dev.ok, .fw-log .ok, .fw-phase.ok { color: var(--go); }
+.fw-dev.bad, .fw-log .bad, .fw-phase.bad { color: var(--rec); }
+.fw-dev.warn, .fw-phase.warn { color: var(--accent); }
+.fw-files { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-auto-rows: var(--sq); gap: 10px; align-items: center; }
+.fw-file { --c: var(--accent); font: inherit; text-align: left; height: 100%; }
+.fw-file:disabled { opacity: 0.35; cursor: default; }
+.fw-files .sr-btn { justify-self: start; }
+.fw-phase { font-weight: 600; font-size: 14px; }
+.fw-bar { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.fw-bar i { display: block; height: 100%; background: var(--accent); }
+.fw-log { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); }
+
+/* Settings › Monitor */
+.mon { gap: 0; overflow: auto; font: 12px/1.7 ui-monospace, Menlo, monospace; }
+.mon-row { display: grid; grid-template-columns: 96px minmax(0, 220px) 28px minmax(0, 1fr) auto; gap: 12px; color: var(--text); }
+.mon-row > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mon-t, .mon-ch { color: var(--muted); }
+.mon-port { color: var(--muted); }
+.mon-row.ignored { color: #5d6574; }
+.mon-why { color: #5d6574; font-style: italic; }
+
+/* ---- the guide: a spotlight on one part of the panel, and a card beside it ---- */
+.tour { position: fixed; inset: 0; z-index: 40; }
+.tour-dim { position: fixed; inset: 0; width: 100%; height: 100%; }
+.tour-dim path { fill: rgba(6, 8, 11, 0.72); }
+.tour-rings i { position: fixed; border-radius: 10px; box-shadow: 0 0 0 2px var(--accent); pointer-events: none; }
+.tour-card {
+  position: fixed;
+  width: min(340px, calc(100vw - 24px));
+  padding: 16px 18px 14px;
+  background: var(--body);
+  border: 1px solid #343a46;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  transition: left 220ms ease, top 220ms ease;
+}
+.tour-num { font: 600 11px ui-monospace, Menlo, monospace; color: var(--accent); letter-spacing: 0.06em; }
+.tour-card h3 { margin: 4px 0 6px; font-size: 16px; }
+.tour-card p { margin: 0; font-size: 13.5px; line-height: 1.5; color: #c3c8d1; }
+.tour-card .tour-hw { margin-top: 10px; padding-top: 9px; border-top: 1px solid #2b303a; font-size: 12.5px; color: #aab1bd; }
+.tour-hw b { display: inline-block; margin-right: 7px; padding: 1px 6px; border-radius: 4px; background: #2b303a; color: var(--accent); font: 600 10px ui-monospace, Menlo, monospace; letter-spacing: 0.06em; text-transform: uppercase; vertical-align: 1px; }
+.tour-x { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 13px; cursor: pointer; }
+.tour-x:hover { background: var(--panel-2); color: var(--text); }
+.tour-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.tour-hide { margin-right: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); cursor: pointer; }
+.tour-hide input { accent-color: var(--accent); margin: 0; }
+.tour-btn { padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); font: 600 13px system-ui, sans-serif; cursor: pointer; }
+.tour-btn:disabled { opacity: 0.35; cursor: default; }
+.tour-btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1406; }
+/* Settings › Guide */
+.tour-row { grid-template-columns: minmax(0, 1fr) auto; }
+.tour-toggle { font: 600 12px system-ui, sans-serif; color: var(--muted); padding: 4px 10px; border: 1px solid var(--line); border-radius: 7px; }
+.tour-toggle.on { color: var(--accent); border-color: #6b5420; }

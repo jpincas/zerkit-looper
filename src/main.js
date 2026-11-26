@@ -19,6 +19,9 @@ import { PEDALS } from './fx.js';
 import { registerSynth, SYNTH_KEY } from './synth.js';
 import { setupSynthPage } from './synthpage.js';
 import { setupSettings } from './settings.js';
+import { setupFirmware } from './firmware.js';
+import { setupMonitor } from './monitor.js';
+import { setupTour } from './tour.js';
 
 const TRACKS = 8;
 const audio = new AudioOut(TRACKS);
@@ -295,8 +298,8 @@ for (const [row, col, key, def] of [
     title: 'Tap: undo the last recording (Z). Shift: redo it (⇧Z)' }],
   [3, 8, 'save', { tap: 'Save', shift: 'Template', act: e => (shifted(e) ? session.saveTemplate() : session.save()),
     title: 'Tap: save the project (⌘S; the first time, name it; ⇧⌘S: save as). Shift: save the setup, without the loops, as a template' }],
-  [3, 9, 'open', { tap: 'Open', shift: 'Template', act: e => (shifted(e) ? session.openTemplate() : session.open()),
-    title: 'Tap: open a recent project (⌘O). Shift: start a new project from a template (or the stock setup)' }],
+  [3, 9, 'open', { tap: 'Open', shift: 'New', act: e => (shifted(e) ? session.openTemplate() : session.open()),
+    title: 'Tap: open a recent project (⌘O). Shift: a new project (from your default setup, or pick another template)' }],
   [3, 10, 'shift', { tap: 'Shift', act: () => (shiftLatch = !shiftLatch), title: 'Shift: hold the Shift key, or click this for the next press' }],
   [4, 1, 'preset', { tap: 'Instrument', shift: 'List', act: e => (shifted(e) ? actions.togglePage('presets') : actions.nextInstrument(1)),
     title: 'Tap: the selected track\'s next instrument (of those switched on in the Instruments page). Shift: open the Instruments page, or go back to the Looper' }],
@@ -616,6 +619,10 @@ inputs.list();
 // Play the selected track's sound (audio tracks ignore them: those record their input).
 // The sustain pedal holds notes like a piano: a key let go while it's down keeps sounding
 // until the pedal comes up, and is recorded that long.
+// Ports the looper sends to (its MIDI instruments' outputs): never heard, or notes would loop back.
+const ownOutput = name => Object.values(INSTRUMENTS).some(d => d.midi && d.output === name);
+// A MIDI instrument's own keyboard plays its track whatever Settings › MIDI picks.
+const ownInput = name => isMidi(engine.selected) && inst(engine.selected).input === name;
 let sustain = false;
 const sustained = new Set();                       // keyboard notes let go while the pedal was down
 connectMidiKeyboards({
@@ -641,7 +648,8 @@ connectMidiKeyboards({
     sustained.clear();
   },
   onStatus: () => {},                    // MIDI in's state isn't shown for now
-  isOwnOutput: name => Object.values(INSTRUMENTS).some(d => d.midi && d.output === name),
+  isOwnOutput: ownOutput,
+  ownInput,
 });
 
 // ---- pages ----------------------------------------------------------------------
@@ -650,8 +658,37 @@ connectMidiKeyboards({
 // FX page: the selected track's pedalboard.
 const fxPage = setupFxPage({ root: $('page-fx'), audio, engine, trackName: nameOf,
   shiftHeld: () => shiftDown(), consumeShift: () => { shiftLatch = false; } });
-// Settings (the cog): templates, for now.
-const settings = setupSettings({ root: $('page-settings'), INSTRUMENTS, DEFAULTS, toast: (...a) => session.toast(...a) });
+// The guide: a click-through of the panel. Each step opens its page (or the playing panel, or
+// Jam); closing it puts back what was on screen. Its Synth step shows the synth of the selected
+// track, or of a synth track, even when it isn't one (`guideSynth`): nothing is changed.
+let guideSynth = false;
+const tour = setupTour({
+  snapshot: () => ({ page, notePanel, jam, sel: engine.selected, sp: settings.page() }),
+  restore(s) {
+    guideSynth = false;
+    page = s.page; notePanel = s.notePanel; jam = s.jam;
+    engine.select(s.sel);
+    settings.selectPage(s.sp);
+  },
+  view(v) {
+    session.close();
+    page = v.page ?? 'looper';
+    notePanel = !!v.keys;
+    jam = !!v.jam;
+    guideSynth = page === 'synth';
+    if (guideSynth && !isSynth(engine.selected)) {
+      const t = engine.tracks.findIndex((_, i) => isSynth(i));
+      if (t >= 0) engine.select(t);
+    }
+  },
+});
+// Settings (the cog): templates, the MIDI input that plays the selected track, the Circuit's
+// firmware, a MIDI monitor and the guide.
+const settings = setupSettings({
+  root: $('page-settings'), INSTRUMENTS, DEFAULTS, toast: (...a) => session.toast(...a),
+  more: [setupFirmware({ onBusy: busy => { app.flashing = busy; } }), setupMonitor({ isOwnOutput: ownOutput, ownInput }), tour.page],
+  onMidiChange: () => { for (const src of [...pressed.keys()]) if (src.startsWith('midi:')) release(src); },   // no stuck notes
+  isOwnOutput: ownOutput });
 // Synth page: the selected track's synth.
 const synthPage = setupSynthPage({ root: $('page-synth'), audio, engine, isSynth,
   shiftHeld: () => shiftDown(), consumeShift: () => { shiftLatch = false; } });
@@ -674,7 +711,7 @@ function pageCards() {
 function drawPage() {
   // The Synth page is only for synth tracks: picking another track, switching this one to another
   // sound, or jamming goes back to the Looper.
-  if (page === 'synth' && (jam || !isSynth(engine.selected))) page = 'looper';
+  if (page === 'synth' && !guideSynth && (jam || !isSynth(engine.selected))) page = 'looper';
   document.body.dataset.page = page;
   btn.preset.classList.toggle('page-on', page === 'presets');
   btn.kits.classList.toggle('page-on', page === 'kits');
@@ -763,7 +800,12 @@ function frame() {
   const sel = engine.selected;
   const b = engine.beat();
 
-  $('sound-gate').hidden = !soundBlocked();
+  // Sound off (and the last project waiting for a click): a notice floating at the bottom.
+  const reopening = session.reopening();
+  $('sound-gate').hidden = !soundBlocked() && !reopening;
+  document.body.classList.toggle('gated', !$('sound-gate').hidden);
+  setText($('sound-gate'), reopening ? `Click anywhere to reopen “${reopening}”` : 'Click anywhere to turn the sound on');
+  saveView();
   setText($('status'), status());
   for (const f of audio.fx) f.setTempo(engine.bpm);        // delays follow the tempo
   for (const s of audio.synth) s.setTempo(engine.bpm);     // so do synth LFOs
@@ -872,6 +914,7 @@ function frame() {
     }
   }
 
+  document.body.classList.add('ready');          // built: show the panel (hidden till now, so nothing shifts)
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -919,6 +962,7 @@ const app = {
   knobPage: () => (page === 'fx' ? fxPage : page === 'synth' && isSynth(engine.selected) ? synthPage : null),
   pageControls: () => (page === 'presets' ? instPage.controls() : null),   // the instrument maker
   circuitShift: false,
+  flashing: false,               // Settings › Firmware is talking to the Circuit in recovery mode
   notePanel: () => notePanel,
   session,
   settings,
@@ -934,4 +978,39 @@ const app = {
 };
 connectCircuit(app);
 window.looper = app; // for debugging from the console
-session.startup();   // the default template's setup, if there is one
+// ---- what's on screen, in the address ------------------------------------------------
+// #<track>[/<page>[/<settings page>]][/keys], e.g. #3/fx, #1/settings/midi, #0 (Jam), #2/keys, so
+// a refresh comes back to the same view. Replaced as it changes, so Back still leaves the looper.
+const URL_PAGE = { presets: 'instruments' };
+function viewHash() {
+  const parts = [jam ? 0 : engine.selected + 1];
+  if (page !== 'looper') parts.push(URL_PAGE[page] ?? page);
+  if (page === 'settings') parts.push(settings.pages[settings.page()].name.toLowerCase());
+  if (notePanel) parts.push('keys');
+  return '#' + parts.join('/');
+}
+function saveView() {
+  if (tour.isOpen()) return;                 // the guide's screens aren't yours: the address keeps yours
+  const h = viewHash();
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+function loadView() {
+  const parts = decodeURIComponent(location.hash.slice(1)).split('/').filter(Boolean);
+  if (!parts.length) return;
+  const t = Number(parts.shift());
+  if (t === 0) jam = true; else if (t >= 1 && t <= TRACKS) { jam = false; engine.select(t - 1); }
+  if (parts.at(-1) === 'keys') { parts.pop(); notePanel = true; }
+  const p = parts.shift();
+  const name = Object.keys(URL_PAGE).find(k => URL_PAGE[k] === p) ?? p;
+  if (['presets', 'kits', 'audio', 'midi', 'fx', 'synth', 'settings'].includes(name)) page = name;
+  if (page === 'settings' && parts[0]) {
+    const i = settings.pages.findIndex(pg => pg.name.toLowerCase() === parts[0]);
+    if (i >= 0) settings.selectPage(i);
+  }
+}
+loadView();                                  // the track, page and panel from the address...
+const view = location.hash;
+session.startup().then(() => {               // ...then the last project (or the default template)
+  if (location.hash !== view) { history.replaceState(null, '', view); loadView(); }   // e.g. its synth page once it has its synth tracks
+  requestAnimationFrame(() => requestAnimationFrame(() => tour.startup()));   // the guide, once the panel's drawn
+});
