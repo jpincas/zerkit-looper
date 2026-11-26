@@ -5,6 +5,7 @@ import { Projects, supported } from './projects.js';
 import { defaultFx, readFx } from './fx.js';
 import { defaultSynth, readSynth } from './synth.js';
 import { RETIRED } from './instruments.js';
+import { templates } from './templates.js';
 
 const FORMAT = 'zerkit-project', VERSION = 1;
 
@@ -55,6 +56,12 @@ export function setupSession(ctx) {
       tracks,
     };
     return { json, audioFiles };
+  }
+
+  // A template: the project without its recordings.
+  function templateOf(json) {
+    const { nextPass, ...rest } = json;
+    return { ...rest, tracks: json.tracks.map(({ loop, notes, clips, ...t }) => t) };
   }
 
   const keyOf = json => JSON.stringify(json);
@@ -118,6 +125,7 @@ export function setupSession(ctx) {
     engine.pass = json.nextPass ?? 1 + Math.max(0, ...json.tracks.flatMap(t => [...(t.notes ?? []), ...(t.clips ?? [])].map(n => n.pass)));
   }
 
+  // The stock setup (what a new project is without a default template).
   function reset() {
     engine.stop();
     engine.clearAll();
@@ -213,13 +221,15 @@ export function setupSession(ctx) {
     toastTimer = setTimeout(() => (t.className = `toast ${kind}`), kind === 'ok' ? 1300 : 3200);
   }
 
-  // Name box: the first save, and Save As.
-  function nameBox(title, initial) {
+  // Name box: the first save, Save As, and Save template (`exists`, `save` and `note` for those).
+  function nameBox(title, initial, kind = {}) {
     const folder = store.folderName;
+    const exists = kind.exists ?? (async n => n !== name && (await store.access()) === 'granted' && store.exists(n));
+    const save = kind.save ?? write;
     showDialog(`
       <h3>${title}</h3>
       <input class="dlg-name" id="dlg-name" maxlength="80" spellcheck="false" value="${esc(initial)}">
-      <p class="dlg-note" id="dlg-note">${folder ? `In your projects folder, “${esc(folder)}”.` : 'You’ll choose a folder for your projects (just this once).'}</p>
+      <p class="dlg-note" id="dlg-note">${kind.note ?? (folder ? `In your projects folder, “${esc(folder)}”.` : 'You’ll choose a folder for your projects (just this once).')}</p>
       <div class="dlg-actions"><button class="dlg-btn" data-act="cancel">Cancel</button><button class="dlg-btn primary" data-act="save">Save</button></div>`,
       e => { if (e.key === 'Enter') submit(); });
     const input = $('dlg-name');
@@ -229,15 +239,15 @@ export function setupSession(ctx) {
     async function submit() {
       const n = input.value.trim().replace(/[\\/:*?"<>|]/g, '-');
       if (!n) return input.focus();
-      // Saving under another project's name replaces it: ask once.
-      if (n !== name && confirmReplace !== n && (await store.access()) === 'granted' && (await store.exists(n))) {
+      // Saving under another one's name replaces it: ask once.
+      if (confirmReplace !== n && (await exists(n))) {
         confirmReplace = n;
         $('dlg-note').innerHTML = `<b class="warn">“${esc(n)}” already exists.</b> Save again to replace it.`;
         dialog.querySelector('[data-act=save]').textContent = 'Replace';
         return;
       }
       closeDialog();
-      write(n);
+      save(n);
     }
     input.addEventListener('input', () => { confirmReplace = null; dialog.querySelector('[data-act=save]').textContent = 'Save'; });
     dialog.querySelector('[data-act=save]').onclick = submit;
@@ -312,11 +322,71 @@ export function setupSession(ctx) {
     dialog.querySelector('[data-act=new]').onclick = go;
     dialog.querySelector('[data-act=cancel]').onclick = closeDialog;
   }
-  function startNew() {
-    reset();
+  // A new project: the default template's setup, or the stock one.
+  function startNew(template = templates.defaultName()) { return fromTemplate(template); }
+
+  // A new, unnamed project with a template's setup (null: the stock setup).
+  async function fromTemplate(tname, quiet = false) {
+    const t = tname ? templates.get(tname) : null;
+    try {
+      if (t) { await ctx.beforeRestore?.(); await restore(t.json, () => Promise.reject(new Error('no audio in a template'))); } else reset();
+    } catch (err) {
+      console.error(err);
+      toast(`Couldn't use the template “${tname}”: ${err.message}`, 'warn');
+      reset();
+    }
+    engine.pass = 0;
     name = null;
     savedKey = keyOf(snapshot().json);
-    toast('New project');
+    closeDialog();
+    if (!quiet) toast(t ? `New project · ${t.name}` : 'New project');
+  }
+
+  // Save template: the setup under a name of your choice (the last one used to start with).
+  let lastTemplate = null;
+  function saveTemplate() {
+    nameBox('Save template', lastTemplate ?? 'My setup', {
+      note: 'Everything but the recordings: sounds, mix, FX, synths, tempo.',
+      exists: async n => templates.exists(n),
+      save(n) {
+        if (!templates.save(n, templateOf(snapshot().json))) return toast('Couldn’t save the template: browser storage is full or blocked', 'warn');
+        lastTemplate = n;
+        toast(`Template saved · ${n}`);
+      },
+    });
+  }
+
+  // Open template: a new project from a template, or the stock setup. Starts on the default.
+  function openTemplateList() {
+    const list = templates.list(), dflt = templates.defaultName();
+    const rows = [{ name: null, label: 'Stock setup', when: 'built in' }, ...list.map(t => ({ name: t.name, label: t.name, when: ago(t.savedAt), json: t.json }))];
+    const dirty = isDirty() && !engine.isEmpty();
+    showDialog(`<h3>New project from a template</h3>
+      ${dirty ? `<p class="dlg-note warn">${name ? `“${esc(name)}” has` : 'This project has'} unsaved changes. Starting a new one discards them.</p>` : ''}
+      <div class="dlg-list" id="dlg-list">${rows.map((r, i) => {
+        const json = r.json, tracks = json ? json.tracks.map(t => INSTRUMENTS[t.instrument]?.color ?? '#888') : DEFAULTS.map(k => INSTRUMENTS[k]?.color ?? '#888');
+        return `<button class="dlg-item${r.name === dflt ? ' current' : ''}" data-i="${i}">
+          <span class="di-name">${esc(r.label)}</span>
+          <span class="di-when">${r.name === dflt ? '★ default' : r.when}</span>
+          <span class="di-tracks">${tracks.map(c => `<i class="on" style="--c:${c}"></i>`).join('')}</span>
+          <span class="di-tempo">${json?.tempo ?? 120} BPM</span>
+        </button>`;
+      }).join('')}</div>
+      <div class="dlg-actions"><span class="dlg-hint">${list.length ? '↑ ↓ to choose · Enter to start' : 'Shift + Save keeps the current setup as a template'}</span><button class="dlg-btn" data-act="cancel">Close</button></div>`);
+    dialog.querySelector('[data-act=cancel]').onclick = closeDialog;
+    const els = [...dialog.querySelectorAll('.dlg-item')];
+    let sel = Math.max(0, rows.findIndex(r => r.name === dflt));
+    const mark = () => els.forEach((r, i) => r.classList.toggle('sel', i === sel));
+    mark();
+    els.forEach((r, i) => {
+      r.onclick = () => fromTemplate(rows[i].name);
+      r.onmouseenter = () => { sel = i; mark(); };
+    });
+    onKey = e => {
+      if (e.key === 'ArrowDown') { sel = Math.min(els.length - 1, sel + 1); mark(); els[sel].scrollIntoView({ block: 'nearest' }); }
+      if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); mark(); els[sel].scrollIntoView({ block: 'nearest' }); }
+      if (e.key === 'Enter') fromTemplate(rows[sel].name);
+    };
   }
 
   savedKey = keyOf(snapshot().json);   // a fresh page counts as unchanged
@@ -329,6 +399,10 @@ export function setupSession(ctx) {
     saveAs() { nameBox('Save as', name ? `${name} copy` : stamp()); },
     open() { if (dialog.hidden) openList(); else closeDialog(); },
     newProject() { if (isDirty() && !engine.isEmpty()) confirmNew(); else startNew(); },
+    saveTemplate,
+    openTemplate() { if (dialog.hidden) openTemplateList(); else closeDialog(); },
+    // When the page opens: the default template's setup, if there is one.
+    async startup() { const d = templates.defaultName(); if (d) await fromTemplate(d, true); },
     name: () => name,
     dirty: isDirty,
     dialogOpen: () => !dialog.hidden,

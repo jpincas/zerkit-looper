@@ -41,7 +41,7 @@ Then open http://localhost:8000 in Chrome.
 4. **Every track has its own length**, like Maschine. A 1-bar drum loop cycles 8 times under
    an 8-bar bass loop. Tracks keep the alignment you heard while recording them.
 5. With a loop on the selected track, **X** toggles overdub, which records into it at its length.
-6. **Undo** (Z, or **Clear** on the Circuit) removes the most recent take or overdub pass, on
+6. **Undo** (Z, or **Duplicate** on the Circuit) removes the most recent take or overdub pass, on
    the one track it was recorded on. A track left empty loses its length.
 7. **Stop** then **Play** restarts from the top of the longest loop.
 
@@ -59,8 +59,8 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   turn the two outer ones. Drag up/down or scroll to turn; double-click resets.
 - **Row above the tracks:** Play/Hide (the play controls; the Circuit's Scales button) | Octave ▼ ▲ (Shift: move the selected track's notes an octave), Q (cycles the selected track's record
   quantise; each track button shows its own: Q off, Q 32, Q 16), Tempo (tap: click; hold + filter knob or scroll: tempo;
-  Shift: swing; shows tempo · swing), Undo (Shift: redo), Clear track, Save (Shift: save as), Open (Shift:
-  new project) | Shift (holds for the next press).
+  Shift: swing; shows tempo · swing), Clear track, Undo (Shift: redo), Save (Shift: save a
+  template), Open (Shift: a new project from a template) | Shift (holds for the next press).
 - **Track row:** Instrument (tap: the selected track's next melodic instrument, of those switched
   on; Shift: the Instruments page) | the eight track buttons | Jam, track "0" in dark grey (tap or
   `0`: deselect every track, see below). A small icon by each track's name shows its type: keyboard
@@ -79,8 +79,8 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   Below them, filling the other three rows, the selected track's sequencer on the shared timeline (the longest loop), with repeats of shorter loops drawn faded. Its header shows the transport: what the looper is doing, the bar.beat and the beat dots.
 - **Beside the pads:** the sound sources down the left, under Instrument: Kits (tap: next kit;
   Shift: the Kits page), Synth (see Synth tracks), Audio (tap: next audio instrument; Shift: the
-  Audio page) and MIDI (tap: next MIDI instrument; Shift: the MIDI page). On the right: a spare
-  button (unused so far), FX, Record, Play.
+  Audio page) and MIDI (tap: next MIDI instrument; Shift: the MIDI page). On the right: Settings
+  (the cog, see below), FX, Record, Play.
 
 **Jam** (track 0) deselects every track, so keyboards and pads play nothing in the looper and you
 can play your own instrument over the loop. Pick a track to come back.
@@ -117,8 +117,8 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Circuit | Looper |
 | --- | --- |
 | Play / Record | Play-stop / record (arm, close, overdub) |
-| Clear / Shift + Clear | Undo the last recording / redo it |
-| Duplicate | Clear the selected track |
+| Clear | Clear the selected track |
+| Duplicate / Shift + Duplicate | Undo the last recording / redo it |
 | Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 |
 | Preset / Shift + Preset | The selected track's next instrument (of those switched on) / Instruments page on and off |
 | Note / Shift + Note | The selected track's next kit (of those switched on) / Kits page on and off |
@@ -133,8 +133,9 @@ With the patched firmware (see `docs/circuit-protocol.md`), the Circuit drives t
 | Scales | Switch between track view and Note mode (and the play controls on screen) |
 | FX / Shift + FX | The selected track's 8 FX pedals (knob: a pedal's mix; hold pad 1-3 + knob: its controls; bottom pad: footswitch; Shift + pad: one of 32 presets) / bypass them |
 | 1-16/17-32 | Cycle the selected track's record quantise (its light: red off, amber 32nds, green 16ths) |
-| Save / Shift + Save | Save the project / save as |
-| Projects / Shift + Projects | Open a recent project (on screen) / new project |
+| Save / Shift + Save | Save the project / save a template |
+| Projects / Shift + Projects | Open a recent project / a new project from a template (both on screen) |
+| Mixer | Settings on and off (track buttons: its page; Octave ▲ ▼ or the master filter knob: choose; Play: pick; Clear: delete) |
 | Master volume knob | Master volume |
 | Master filter knob | Click level (hold Tempo: tempo; Shift too: swing) |
 
@@ -163,11 +164,27 @@ them live exactly as played; the loop plays them on the grid from the next pass.
 ## Projects
 
 **Save** (⌘S) the first time asks for a name, then saves straight away every time after, with a
-brief "Saved" notice. **⇧ Save** (⇧⌘S) saves under a new name. **Open** (⌘O) lists recent
-projects, newest first (↑ ↓ and Enter, or click). **⇧ Open** starts a new project. Opening or
-starting a new project asks first if there are unsaved changes. The current project's name is in
-the logo row, with • while there are unsaved changes (Save shows it too, and its light on the
-Circuit is white).
+brief "Saved" notice. ⇧⌘S saves under a new name. **Open** (⌘O) lists recent projects, newest
+first (↑ ↓ and Enter, or click). Opening warns first if there are unsaved changes. The current
+project's name is in the logo row, with • while there are unsaved changes (Save's border
+brightens, and its light on the Circuit is white).
+
+**Templates** are a project's setup without its recordings: tempo, swing, each track's sound,
+octave, quantise, mix, FX and synth, and which instruments each button cycles through.
+**⇧ Save** keeps the current setup as a template under a name. **⇧ Open** starts a new project
+from one, or from the stock setup; the list starts on the default. One template can be the
+**default**: the looper starts with it when it loads. Without one, it's the stock setup.
+Templates are kept in this browser, so they're there straight away.
+
+## Settings
+
+**Settings** (the cog, right of the pads; Mixer on the Circuit) fills the pad area, and the track
+buttons pick its page. Inside it ▲ ▼ (the Octave buttons, arrow keys or the master filter knob)
+choose a row, Play (Enter) does the row's thing, Clear track (⌫; Clear on the Circuit) deletes it
+on the second press. On the Circuit each row is also a pad (amber: the default).
+
+- **Templates** (track 1): the stock setup and your templates. Play makes the chosen one the
+  default (again: back to the stock setup).
 
 Projects live in a folder on your computer, chosen the first time you save (Chrome asks for
 permission to use it; choose "Allow on every visit", or it asks again after a reload). Each
@@ -319,7 +336,8 @@ audio instruments they're kept on this computer and projects remember their sett
   cards every page uses; `src/fx.js` / `src/fxpage.js`: the per-track pedals, and the FX page; `src/synth.js` /
   `src/synthpage.js`: the per-track synth, and the Synth page.
 - `src/projects.js`: the projects folder and the project files; `src/session.js`: the current
-  project (saving, opening, new) and its screens.
+  project (saving, opening, new, templates) and its screens; `src/templates.js`: template
+  storage; `src/settings.js`: the Settings pages.
 - `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits
   page and kit editor.
 - `kits/`: the built-in kits; `tools/build_kits.py` builds them. `instruments/`: the built-in

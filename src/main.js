@@ -18,6 +18,7 @@ import { setupFxPage } from './fxpage.js';
 import { PEDALS } from './fx.js';
 import { registerSynth, SYNTH_KEY } from './synth.js';
 import { setupSynthPage } from './synthpage.js';
+import { setupSettings } from './settings.js';
 
 const TRACKS = 8;
 const audio = new AudioOut(TRACKS);
@@ -99,7 +100,11 @@ const actions = {
     const t = engine.selected;
     octaves[t] = Math.max(0, Math.min(7, octaves[t] + d));
   },
-  select(t) { jam = false; engine.select(t); },
+  select(t) {
+    if (page === 'settings') return settings.selectPage(t);   // Settings: the track buttons pick its page
+    jam = false;
+    engine.select(t);
+  },
   // Jam: no track selected, so keyboards and pads play nothing in the looper and you can play
   // over the loop (on an instrument that makes its own sound). Picking a track ends it.
   jam() {
@@ -134,7 +139,7 @@ const actions = {
     actions.instrument(t, keys[(keys.indexOf(audio.instruments[t]) + 1) % keys.length]);
   },
   // Pages: Shift + Preset / Kits opens that page, and the same again goes back to the Looper.
-  togglePage(name) { page = page === name ? 'looper' : name; },
+  togglePage(name) { if (page === 'settings') settings.close(); page = page === name ? 'looper' : name; },
   // MIDI: the selected track's next MIDI instrument among those switched on in the MIDI page.
   nextMidi() {
     const keys = Object.keys(INSTRUMENTS).filter(k => INSTRUMENTS[k].midi && midiOn[k] !== false).sort((a, b) => a.localeCompare(b));
@@ -276,21 +281,22 @@ const btn = {};
 for (const [row, col, key, def] of [
   [3, 1, 'note', { tap: 'Play', act: () => actions.toggleNotes(),
     title: 'Show or hide the play controls under the looper: keyboard (instrument and MIDI tracks) or kit pads (kit tracks). On the Circuit: Note mode' }],
-  [3, 2, 'octDown', { tap: 'Octave ▼', shift: 'Track ▼', act: e => (shifted(e) ? actions.transpose(-1) : actions.octave(-1)),
+  [3, 2, 'octDown', { tap: 'Octave ▼', shift: 'Track ▼', act: e => (page === 'settings' ? settings.move(1) : shifted(e) ? actions.transpose(-1) : actions.octave(-1)),
     title: 'Tap: keyboard octave down (,). Shift: move the selected track\'s notes down an octave' }],
-  [3, 3, 'octUp', { tap: 'Octave ▲', shift: 'Track ▲', act: e => (shifted(e) ? actions.transpose(1) : actions.octave(1)),
+  [3, 3, 'octUp', { tap: 'Octave ▲', shift: 'Track ▲', act: e => (page === 'settings' ? settings.move(-1) : shifted(e) ? actions.transpose(1) : actions.octave(1)),
     title: 'Tap: keyboard octave up (.). Shift: move the selected track\'s notes up an octave' }],
   [3, 4, 'quant', { tap: 'Q', act: () => actions.quant(), title: 'Record quantise for the selected track: off → 32nds → 16ths (each track button shows its own)' }],
   [3, 5, 'tempo', { tap: 'Click', shift: 'Swing', shiftHold: true, hold: 'Tempo', act: () => actions.click(),
     title: 'Tap: the metronome (C). Hold + turn the master filter knob (or scroll over it): tempo (↑ ↓). Shift + hold + turn (or Shift + scroll): swing' }],
-  [3, 6, 'clear', { tap: 'Undo', shift: 'Redo', act: e => (shifted(e) ? actions.redo() : actions.undo()),
+  // Clear track and Undo sit on the Circuit's Clear and Duplicate buttons.
+  [3, 6, 'clearTrack', { tap: 'Clear track', act: () => (page === 'settings' ? settings.del() : actions.clearTrack()),
+    title: 'Clear the selected track (⌫). In Settings: delete the chosen item' }],
+  [3, 7, 'undo', { tap: 'Undo', shift: 'Redo', act: e => (shifted(e) ? actions.redo() : actions.undo()),
     title: 'Tap: undo the last recording (Z). Shift: redo it (⇧Z)' }],
-  [3, 7, 'clearTrack', { tap: 'Clear track', act: () => actions.clearTrack(),
-    title: 'Clear the selected track (⌫)' }],
-  [3, 8, 'save', { tap: 'Save', shift: 'Save as', act: e => (shifted(e) ? session.saveAs() : session.save()),
-    title: 'Tap: save the project (⌘S; the first time, name it). Shift: save as (⇧⌘S)' }],
-  [3, 9, 'open', { tap: 'Open', shift: 'New', act: e => (shifted(e) ? session.newProject() : session.open()),
-    title: 'Tap: open a recent project (⌘O). Shift: start a new project' }],
+  [3, 8, 'save', { tap: 'Save', shift: 'Template', act: e => (shifted(e) ? session.saveTemplate() : session.save()),
+    title: 'Tap: save the project (⌘S; the first time, name it; ⇧⌘S: save as). Shift: save the setup, without the loops, as a template' }],
+  [3, 9, 'open', { tap: 'Open', shift: 'Template', act: e => (shifted(e) ? session.openTemplate() : session.open()),
+    title: 'Tap: open a recent project (⌘O). Shift: start a new project from a template (or the stock setup)' }],
   [3, 10, 'shift', { tap: 'Shift', act: () => (shiftLatch = !shiftLatch), title: 'Shift: hold the Shift key, or click this for the next press' }],
   [4, 1, 'preset', { tap: 'Instrument', shift: 'List', act: e => (shifted(e) ? actions.togglePage('presets') : actions.nextInstrument(1)),
     title: 'Tap: the selected track\'s next instrument (of those switched on in the Instruments page). Shift: open the Instruments page, or go back to the Looper' }],
@@ -303,11 +309,12 @@ for (const [row, col, key, def] of [
     title: 'Tap: the selected track\'s next audio instrument (of those switched on in the Audio page). Shift: open the Audio page, or go back to the Looper' }],
   [8, 1, 'midi', { tap: 'MIDI', shift: 'List', act: e => (shifted(e) ? actions.togglePage('midi') : actions.nextMidi()),
     title: 'Tap: the selected track\'s next MIDI instrument (of those switched on in the MIDI page). Shift: open the MIDI page, or go back to the Looper' }],
-  [5, 10, 'spare', { tap: '', title: 'Not used yet' }],
+  [5, 10, 'settings', { tap: '', act: () => actions.togglePage('settings'),
+    title: 'Settings (the cog): the track buttons pick its page; ▲ ▼ or the master filter knob choose, Play picks, Clear track deletes' }],
   [6, 10, 'fx', { tap: 'FX', shift: 'Bypass', act: e => (shifted(e) ? fxPage.bypass() : actions.togglePage('fx')),
     title: 'Tap: the selected track\'s FX, 8 pedals (on the Circuit: a column\'s knob turns its pedal\'s mix; hold pad 1-3 of the column and turn for its controls; the bottom pad is the footswitch). Shift: bypass its FX' }],
   [7, 10, 'record', { tap: 'Record', act: () => actions.record(), title: 'Record (X)' }],
-  [8, 10, 'play', { tap: 'Play', act: () => actions.play(), title: 'Play / Stop (Space)' }],
+  [8, 10, 'play', { tap: 'Play', act: () => (page === 'settings' ? settings.enter() : actions.play()), title: 'Play / Stop (Space). In Settings: do the chosen row\'s thing (Enter)' }],
 ]) {
   const b = makeButton(row === 3 && col > 1 && col < 10 ? $('aux') : $('device'), { ...def, cls: key });
   if (b.parentElement.id === 'device') { b.style.gridRow = row; b.style.gridColumn = col; }
@@ -329,7 +336,7 @@ btn.tempo.addEventListener('wheel', e => {
 // Track buttons, then mute and solo pads under each.
 const tbtns = [];
 for (let t = 0; t < TRACKS; t++) {
-  const b = el('button', 'tbtn', `<span class="tnum">${t + 1}</span><i class="tdot"></i><span class="tinst"><i class="ticon"></i><span class="tname"></span></span><span class="tlen"></span><b class="tq"></b><b class="tfx">FX</b>`);
+  const b = el('button', 'tbtn', `<span class="tnum">${t + 1}</span><i class="tdot"></i><span class="tinst"><i class="ticon"></i><span class="tname"></span></span><span class="tlen"></span><b class="tq"></b><b class="tfx">FX</b><span class="tpage"></span>`);
   b.title = `Track ${t + 1} (${t + 1})`;
   b.addEventListener('click', () => actions.select(t));
   $('trackbar').appendChild(b);
@@ -343,7 +350,7 @@ for (let t = 0; t < TRACKS; t++) {
   so.setAttribute('aria-label', so.title);
   so.addEventListener('click', () => actions.solo(t));
   $('solo-row').appendChild(so);
-  tbtns.push({ el: b, name: b.querySelector('.tname'), len: b.querySelector('.tlen'), dot: b.querySelector('.tdot'), q: b.querySelector('.tq'), fx: b.querySelector('.tfx'), m, s: so });
+  tbtns.push({ el: b, name: b.querySelector('.tname'), len: b.querySelector('.tlen'), dot: b.querySelector('.tdot'), q: b.querySelector('.tq'), fx: b.querySelector('.tfx'), page: b.querySelector('.tpage'), m, s: so });
 }
 
 const instSelect = $('inst');
@@ -460,6 +467,11 @@ window.addEventListener('keydown', e => {
   }
   if (session.dialogOpen()) { session.key(e); return; }      // a project screen is up: keys are for it
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (page === 'settings' && !(e.target instanceof HTMLInputElement)) {    // Settings: ▲ ▼ choose, Enter / Space pick, ⌫ deletes
+    const k = { ArrowUp: () => settings.move(-1), ArrowDown: () => settings.move(1), Enter: () => settings.enter(), Space: () => settings.enter(),
+      Backspace: () => settings.del(), Delete: () => settings.del(), Escape: () => actions.togglePage('settings') }[e.code];
+    if (k) { e.preventDefault(); k(); return; }
+  }
   if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement) e.target.blur();
   if (e.code in KEYS) {
     e.preventDefault();
@@ -638,6 +650,8 @@ connectMidiKeyboards({
 // FX page: the selected track's pedalboard.
 const fxPage = setupFxPage({ root: $('page-fx'), audio, engine, trackName: nameOf,
   shiftHeld: () => shiftDown(), consumeShift: () => { shiftLatch = false; } });
+// Settings (the cog): templates, for now.
+const settings = setupSettings({ root: $('page-settings'), INSTRUMENTS, DEFAULTS, toast: (...a) => session.toast(...a) });
 // Synth page: the selected track's synth.
 const synthPage = setupSynthPage({ root: $('page-synth'), audio, engine, isSynth,
   shiftHeld: () => shiftDown(), consumeShift: () => { shiftLatch = false; } });
@@ -652,6 +666,7 @@ function pageCards() {
     case 'midi': return midiPage.editing() ? null : midiPage.cards;
     case 'fx': return fxPage.cards;
     case 'synth': return synthPage.cards;
+    case 'settings': return settings.cards;
   }
   return null;
 }
@@ -671,6 +686,9 @@ function drawPage() {
   btn.synth.classList.toggle('page-on', page === 'synth');
   $('page-synth').hidden = page !== 'synth';
   if (page === 'synth') synthPage.update();
+  btn.settings.classList.toggle('page-on', page === 'settings');
+  $('page-settings').hidden = page !== 'settings';
+  if (page === 'settings') settings.update();
   const midiShown = !$('page-midi').hidden;
   $('page-midi').hidden = page !== 'midi';
   if (page === 'midi') { if (!midiShown) midiPage.show(); midiPage.update(); }
@@ -761,7 +779,7 @@ function frame() {
   btn.tempo.classList.toggle('on', engine.click);
   btn.tempo.classList.toggle('beat', engine.click && engine.playing && b >= 0 && b % 1 < 0.15);
   lcd.show(shiftDown() ? engine.swing : engine.bpm, shiftDown() ? 'SWING' : 'BPM');
-  btn.clear.classList.toggle('on', !engine.isEmpty() || engine.canRedo());
+  btn.undo.classList.toggle('on', !engine.isEmpty() || engine.canRedo());
   btn.clearTrack.classList.toggle('on', engine.tracks[sel].notes.length + engine.tracks[sel].clips.length > 0);
   btn.shift.classList.toggle('on', shiftDown());
   document.body.classList.toggle('shift', shiftDown());
@@ -800,6 +818,9 @@ function frame() {
     tb.fx.title = pedals.length ? `FX: ${pedals.join(' + ')}${fx.on ? '' : ' (bypassed)'}` : '';
     setText(tb.q, { off: 'Q off', mid: 'Q 32', strong: 'Q 16' }[engine.tracks[t].quant]);
     setText(tb.len, len ? `${len} bar${len > 1 ? 's' : ''}` : '—');
+    setText(tb.page, settings.pages[t]?.name ?? '');              // Settings: the page this button picks
+    tb.el.classList.toggle('setpage', page === 'settings' && t === settings.page());
+    tb.el.classList.toggle('nopage', !settings.pages[t]);
   });
 
   // The selected track's sequencer
@@ -900,6 +921,7 @@ const app = {
   circuitShift: false,
   notePanel: () => notePanel,
   session,
+  settings,
   page: () => page,
   jam: () => jam,
   canTranspose: () => !isDrums(engine.selected) && !isAudio(engine.selected) && engine.tracks[engine.selected].notes.length > 0,
@@ -912,3 +934,4 @@ const app = {
 };
 connectCircuit(app);
 window.looper = app; // for debugging from the console
+session.startup();   // the default template's setup, if there is one

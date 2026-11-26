@@ -5,7 +5,7 @@ import { INSTRUMENTS } from './instruments.js';
 
 // The sound sources go down the left column (Preset, Note, Velocity, Gate, Pattern Settings):
 // Instruments, Kits, Synth, Audio, MIDI. Jam is the Patterns button, right of the track buttons.
-const BTN = { preset: 8, kits: 9, synth: 10, audio: 11, midi: 12, jam: 13, spare: 14, fx: 15, scales: 18, duplicate: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clear: 23, shift: 27 };
+const BTN = { preset: 8, kits: 9, synth: 10, audio: 11, midi: 12, jam: 13, settings: 14, fx: 15, scales: 18, undo: 24, save: 25, open: 26, quant: 21, record: 16, play: 17, octDown: 19, octUp: 20, tempo: 22, clearTrack: 23, shift: 27 };
 const TRACK_BTNS = [0, 1, 2, 3, 4, 5, 6, 7];     // Synth 1-2, MIDI 1-2, Drum 1-4 -> tracks 1-8
 const N_LEDS = 69;
 const ledBtn = id => 32 + id;
@@ -68,7 +68,28 @@ export function connectCircuit(app) {
     if (a >= 20 && a < 48) return b ? buttonDown(a - 20) : buttonUp(a - 20);
     if (a >= 1 && a <= 8) return knob(a - 1, b >= 64 ? b - 128 : b);
     if (a === 10) return actions.masterVolume(b / 127);    // master volume knob (absolute)
-    if (a === 9) return filterKnob(b);
+    if (a === 9) return app.page() === 'settings' ? settingsKnob(b) : filterKnob(b);
+  }
+
+  // Settings (the cog): the master filter knob moves up and down its list, a step per 2 positions.
+  let settingsTurn = 0;
+  function settingsKnob(b) {
+    const d = lastFilter == null ? 0 : b - lastFilter;
+    lastFilter = b;
+    settingsTurn += d;
+    while (Math.abs(settingsTurn) >= 2) { app.settings.move(Math.sign(settingsTurn)); settingsTurn -= 2 * Math.sign(settingsTurn); }
+  }
+  // ...and the track buttons pick its page, Octave ▲ ▼ move, Play picks, Clear deletes.
+  function settingsButton(id) {
+    const st = app.settings;
+    if (TRACK_BTNS.includes(id)) { st.selectPage(id); return true; }
+    switch (id) {
+      case BTN.octUp: st.move(-1); return true;
+      case BTN.octDown: st.move(1); return true;
+      case BTN.play: st.enter(); return true;
+      case BTN.clearTrack: st.del(); return true;
+    }
+    return false;
   }
 
   // A project screen is open (Open list, name box, "discard changes?"): only the master filter
@@ -110,6 +131,7 @@ export function connectCircuit(app) {
     const controls = app.pageControls?.();
     if (controls && (id === BTN.play || id === BTN.record) && controls.button(id === BTN.play ? 'play' : 'record')) return;
     if (id === BTN.shift) { shift = app.circuitShift = true; return; }
+    if (app.page() === 'settings' && settingsButton(id)) return;
     if (TRACK_BTNS.includes(id)) return actions.select(id);
     switch (id) {
       case BTN.scales: return actions.toggleNotes();                                           // Note mode (Show/Hide)
@@ -125,10 +147,11 @@ export function connectCircuit(app) {
       case BTN.audio: return shift ? actions.togglePage('audio') : actions.nextAudio();        // the Gate button
       case BTN.midi: return shift ? actions.togglePage('midi') : actions.nextMidi();            // the Pattern Settings button
       case BTN.fx: return shift ? app.fxBypass() : actions.togglePage('fx');                   // the track's pedals / bypass
-      case BTN.save: return shift ? app.session.saveAs() : app.session.save();
-      case BTN.open: return shift ? app.session.newProject() : app.session.open();              // the Projects button
-      case BTN.clear: return shift ? actions.redo() : actions.undo();
-      case BTN.duplicate: return actions.clearTrack();                                         // Clear track
+      case BTN.save: return shift ? app.session.saveTemplate() : app.session.save();
+      case BTN.open: return shift ? app.session.openTemplate() : app.session.open();            // the Projects button
+      case BTN.settings: return actions.togglePage('settings');                                // the Mixer button (the cog)
+      case BTN.clearTrack: return actions.clearTrack();                                        // the Clear button
+      case BTN.undo: return shift ? actions.redo() : actions.undo();                           // the Duplicate button
       case BTN.jam: return actions.jam();                                                      // the Patterns button
     }
   }
@@ -174,6 +197,7 @@ export function connectCircuit(app) {
       f[KNOB_LED + 8] = C.white;                            // the master filter knob
       return f;
     }
+    if (app.page() === 'settings') return settingsLights(f);
     const sel = engine.selected;
     const b = engine.beat();
     const blink = Math.floor(performance.now() / 250) % 2 === 0;
@@ -201,8 +225,9 @@ export function connectCircuit(app) {
       closing: blink ? C.red : C.dimRed,
       overdub: C.amber,
     }[engine.rec];
-    f[ledBtn(BTN.clear)] = (shift ? engine.canRedo() : !engine.isEmpty()) ? C.white : C.off;   // something to undo / redo
-    f[ledBtn(BTN.duplicate)] = engine.tracks[sel].notes.length + engine.tracks[sel].clips.length ? C.white : C.off;   // something to clear
+    f[ledBtn(BTN.undo)] = (shift ? engine.canRedo() : !engine.isEmpty()) ? C.white : C.off;   // something to undo / redo
+    f[ledBtn(BTN.clearTrack)] = engine.tracks[sel].notes.length + engine.tracks[sel].clips.length ? C.white : C.off;   // something to clear
+    f[ledBtn(BTN.settings)] = C.dim;
     const onBeat = engine.playing && b >= 0 && b % 1 < 0.15;
     f[ledBtn(BTN.tempo)] = tempoHeld ? C.white : engine.click ? (onBeat ? C.white : C.dim) : C.off;
     f[ledBtn(BTN.octDown)] = f[ledBtn(BTN.octUp)] = (shift ? app.canTranspose() : !app.isDrums(sel)) ? C.white : C.off;
@@ -222,6 +247,21 @@ export function connectCircuit(app) {
     else if (isNoteMode() && app.isDrums(sel)) kitLights(f, sel, instCode);
     else if (isNoteMode()) noteLights(f, sel, instCode);
     else trackLights(f, sel, instCode);
+    return f;
+  }
+
+  // Settings: its pages on the track buttons (white: the one shown), its controls, a pad per row.
+  function settingsLights(f) {
+    const st = app.settings;
+    TRACK_BTNS.forEach(t => (f[ledBtn(t)] = t === st.page() ? C.white : st.pages[t] ? C.dim : C.off));
+    f[ledBtn(BTN.settings)] = C.white;
+    f[ledBtn(BTN.octUp)] = f[ledBtn(BTN.octDown)] = C.white;
+    f[ledBtn(BTN.play)] = C.green;
+    f[ledBtn(BTN.clearTrack)] = st.canDelete() ? C.white : C.off;
+    f[ledBtn(BTN.save)] = f[ledBtn(BTN.open)] = C.dim;
+    f[ledBtn(BTN.shift)] = shift ? C.white : C.dim;
+    f[KNOB_LED + 8] = C.white;                              // the master filter knob
+    pageLights(f, st.cards);
     return f;
   }
 
