@@ -5,7 +5,7 @@
 > as audio, with an ordinary audio track (any input). This page is kept as a record of what the
 > CP88 does over MIDI and what was tried. The code and the monitor test buttons were removed.
 
-Sources: the CP88/CP73 Owner's Manual (menu list, settings list, data list), plus tests on Jon's
+Sources: the CP88/CP73 Owner's Manual (menu list, settings list, data list), plus tests on a
 CP88 over USB on 2026-11-24.
 
 ## Connection

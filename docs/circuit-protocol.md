@@ -1,5 +1,9 @@
 # Circuit Tracks control-surface protocol (LOOP04 / LOOP05 / LOOP06 firmware)
 
+> **Disclaimer.** The patched firmware is used entirely at your own risk. The author takes no
+> responsibility for anything that happens to your Circuit Tracks, and installing modified
+> firmware will probably void your Novation warranty. See the README's Circuit Tracks section.
+
 The patched firmware turns the Novation Circuit Tracks into a dedicated USB controller for the
 looper. The Circuit's own sequencer, sounds and screens are switched off. Every input goes to the
 app, and the app sets every light.
