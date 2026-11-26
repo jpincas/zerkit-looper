@@ -66,10 +66,12 @@ Circuit showing LOOP is running and waiting for the app.
 
 - `circuit/build_lights.py` builds LOOP04 (LOOP05 with `--bright`, LOOP06 with `--splash`) from Novation's official 1.2.1 file, which `circuit/fw.py`
   checks by SHA-256. `circuit/test_*.py` run the patched code in an ARM emulator.
-- Settings › Firmware (`src/firmware.js`) sends allow-listed builds to the Circuit in recovery
-  mode, and restores the official firmware. Recovery mode is **Scales + Preset + Note** held at
-  power-on. It needs the builds in `circuit/build/` and Novation's file in `circuit/incoming/`,
-  which aren't in git.
+- `circuit/make_patch.py` writes `src/firmware-patch.js`, LOOP06 as edits to the official image
+  (only our bytes). Settings › Firmware (`src/firmware.js`, `src/fwimage.js`) applies it in the
+  browser to the user's own copy of Novation's file, checks the result's SHA-256 against the
+  Python build, and sends it to the Circuit in recovery mode; it restores the official firmware
+  from the same file. Recovery mode is **Scales + Preset + Note** held at power-on. On a dev
+  machine the official file is read from `circuit/incoming/` (not in git) instead of picked.
 - The patch technique and firmware addresses come from the community project
   [CIRCUIT-HACKS-RC](https://github.com/Ghillermo/CIRCUIT-HACKS-RC) (MIT).
 - Known issue: LOOP02, which sent through the stock gated sender, once had the stock MIDI gate

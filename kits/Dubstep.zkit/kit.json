@@ -1,0 +1,71 @@
+{
+ "format": "zerkit-kit",
+ "version": 1,
+ "name": "Dubstep",
+ "pads": [
+  {
+   "file": "01-kick.flac",
+   "label": "Kick"
+  },
+  {
+   "file": "02-snare.flac",
+   "label": "Snare"
+  },
+  {
+   "file": "03-clap.flac",
+   "label": "Clap"
+  },
+  {
+   "file": "04-rim.flac",
+   "label": "Rim"
+  },
+  {
+   "file": "05-closed-hh.flac",
+   "label": "Closed HH"
+  },
+  {
+   "file": "06-pedal-hh.flac",
+   "label": "Pedal HH"
+  },
+  {
+   "file": "07-open-hh.flac",
+   "label": "Open HH"
+  },
+  {
+   "file": "08-snap.flac",
+   "label": "Snap"
+  },
+  {
+   "file": "09-sub.flac",
+   "label": "Sub"
+  },
+  {
+   "file": "10-sub-drop.flac",
+   "label": "Sub Drop"
+  },
+  {
+   "file": "11-tom.flac",
+   "label": "Tom"
+  },
+  {
+   "file": "12-zap.flac",
+   "label": "Zap"
+  },
+  {
+   "file": "13-crash.flac",
+   "label": "Crash"
+  },
+  {
+   "file": "14-ride.flac",
+   "label": "Ride"
+  },
+  {
+   "file": "15-shaker.flac",
+   "label": "Shaker"
+  },
+  {
+   "file": "16-reverse-crash.flac",
+   "label": "Reverse Crash"
+  }
+ ]
+}

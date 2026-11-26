@@ -9,14 +9,19 @@ export class AudioOut {
     this.ctx = new AudioContext({ latencyHint: 'interactive' });
     // Everything leaves through `out` (the master volume). The browser's own sounds (instruments,
     // kits) go through `master`, a fixed level that sits them against audio tracks, and a
-    // compressor first; audio tracks go straight to `out`; the click has its own level.
+    // compressor first; audio tracks skip that. Both then pass the master filter (low-pass one
+    // way, high-pass the other); the click has its own level and isn't filtered.
     this.out = new GainNode(this.ctx, { gain: 1 });
     this.out.connect(this.ctx.destination);
+    this.lowpass = new BiquadFilterNode(this.ctx, { type: 'lowpass', frequency: 20000, Q: 1 });
+    this.highpass = new BiquadFilterNode(this.ctx, { type: 'highpass', frequency: 10, Q: 1 });
+    this.music = new GainNode(this.ctx, { gain: 1 });
+    this.music.connect(this.lowpass).connect(this.highpass).connect(this.out);
     this.master = new GainNode(this.ctx, { gain: 0.2 });
     this.clickBus = new GainNode(this.ctx, { gain: 0.1 });
     this.clickBus.connect(this.out);
     const comp = new DynamicsCompressorNode(this.ctx, { threshold: -14, ratio: 4 });
-    this.master.connect(comp).connect(this.out);
+    this.master.connect(comp).connect(this.music);
     this.instruments = Array(trackCount).fill(null);   // keys of INSTRUMENTS (set by main.js)
     // Mixer: each track plays into its own gain, set from volume, mute and solo.
     this.vol = Array(trackCount).fill(0.8);   // 0-1, 0.8 = unity
@@ -62,15 +67,25 @@ export class AudioOut {
   // The metronome click's level, 0-1, on a squared curve.
   setClickLevel(level) { this.clickBus.gain.setTargetAtTime(0.18 * level * level, this.now(), 0.02); }
 
+  // Master filter, 0-1, like a DJ mixer's: 0.5 is open, below it a low-pass closes down to
+  // 60 Hz, above it a high-pass opens up to 8 kHz (exponential, so it sweeps evenly by ear).
+  setFilter(v) {
+    const t = this.now(), d = v - 0.5;
+    const lp = d < 0 ? 60 * (20000 / 60) ** (1 + d * 2) : 20000;
+    const hp = d > 0 ? 10 * (8000 / 10) ** (d * 2) : 10;
+    this.lowpass.frequency.setTargetAtTime(lp, t, 0.02);
+    this.highpass.frequency.setTargetAtTime(hp, t, 0.02);
+  }
+
   // Overall output level, 0-1, same curve as the track volumes (0.8 = unity).
   setMasterVolume(v) { this.out.gain.setTargetAtTime((v * v) / 0.64, this.now(), 0.02); }
 
   // Synth tracks share the master stage (level and compressor, tuned for the browser sounds).
-  // Audio tracks skip it and go straight out, so a loop plays back at the level it was recorded.
+  // Audio tracks skip it (only the master filter), so a loop plays back at the level it was recorded.
   route(track) {
     const p = this.panner[track];
     p.disconnect();
-    p.connect(INSTRUMENTS[this.instruments[track]].audio ? this.out : this.master);
+    p.connect(INSTRUMENTS[this.instruments[track]].audio ? this.music : this.master);
   }
 
   setInstrument(track, name) {

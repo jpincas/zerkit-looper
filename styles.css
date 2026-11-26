@@ -418,6 +418,7 @@ body.shift .pbtn.has-shift .plabel, body.shift .pbtn.has-shift .phold { opacity:
 .tbtn[data-type="kit"] .ticon { --icon: var(--icon-pads); }
 .tbtn[data-type="audio"] .ticon { --icon: var(--icon-wave); }
 .tbtn .tlen { font: 11px ui-monospace, Menlo, monospace; }
+.tbtn .tmini { position: absolute; left: 9px; top: 32px; width: calc(100% - 18px); height: calc(100% - 32px - 46px); pointer-events: none; }
 /* record quantise, bottom-right: the Circuit's colours (red off, amber 32nds, green 16ths) */
 .tbtn .tq { position: absolute; right: 7px; bottom: 7px; font: 600 10px ui-monospace, Menlo, monospace; }
 .tbtn .tq[data-q="off"] { color: #5d6574; }
@@ -864,6 +865,8 @@ body[data-page="settings"] .tbtn.setpage .tnum, body[data-page="settings"] .tbtn
 .fw-phase { font-weight: 600; font-size: 14px; }
 .fw-bar { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
 .fw-bar i { display: block; height: 100%; background: var(--accent); }
+.fw-get { justify-self: start; font-size: 13px; color: var(--muted); }
+.fw-get:hover { color: var(--text, #eef0f3); }
 .fw-log { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); }
 
 /* Settings › Monitor */

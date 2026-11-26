@@ -278,6 +278,23 @@ export class Engine {
     this.resync();
   }
 
+  // Trim: cut the track's loop back to the last bar a note starts in, dropping the blank bars
+  // a late Record press leaves at the end. Not on audio tracks (a clip is a whole loop long).
+  trimLength(i) {
+    const t = this.tracks[i];
+    if (!t.loop || t.clips.length || !t.notes.length || (this.rec !== 'idle' && this.recTrack === i)) return 0;
+    const bpb = this.beatsPerBar;
+    const len = (Math.floor(Math.max(...t.notes.map(n => n.start)) / bpb) + 1) * bpb;
+    return len < t.loop.length ? len : 0;
+  }
+  trimTrack(i) {
+    const len = this.trimLength(i);
+    if (!len) return false;
+    this.tracks[i].loop.length = len;
+    this.resync();
+    return true;
+  }
+
   // Undo: throw away the most recent recording - one take or one overdub pass, on the one
   // track it was recorded on. Nothing else is touched.
   //   - during a take: drop it and stay armed, ready for another go

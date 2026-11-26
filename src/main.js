@@ -20,6 +20,7 @@ import { registerSynth, SYNTH_KEY } from './synth.js';
 import { setupSynthPage } from './synthpage.js';
 import { setupSettings } from './settings.js';
 import { setupFirmware } from './firmware.js';
+import { drawMini } from './mini.js';
 import { setupMonitor } from './monitor.js';
 import { setupTour } from './tour.js';
 
@@ -89,6 +90,7 @@ const actions = {
   undo() { engine.undo(); },
   redo() { engine.redo(); },
   clearTrack() { engine.clearTrack(engine.selected); },
+  trimTrack() { engine.trimTrack(engine.selected); },
   clearAll() { engine.clearAll(); },
   click() { engine.click = !engine.click; },
   tempo(d) { engine.setTempo(engine.bpm + d); },
@@ -105,6 +107,7 @@ const actions = {
   },
   select(t) {
     if (page === 'settings') return settings.selectPage(t);   // Settings: the track buttons pick its page
+    if (page === 'synth' && t === engine.selected && !jam) page = 'looper';   // its own track button: back to the loops
     jam = false;
     engine.select(t);
   },
@@ -167,6 +170,9 @@ const actions = {
   },
   // The click's level and the overall output. Both 0-1, remembered in this browser.
   clickLevel(v) { levels.click = clamp01(v); audio.setClickLevel(levels.click); saveLevels(); },
+  // Master filter: 0.5 open (it snaps there near the middle), lower = low-pass, higher = high-pass.
+  // Not remembered: the looper always starts unfiltered.
+  filter(v) { v = clamp01(v); levels.filter = Math.abs(v - 0.5) < 0.025 ? 0.5 : v; audio.setFilter(levels.filter); },
   masterVolume(v) { levels.master = clamp01(v); audio.setMasterVolume(levels.master); saveLevels(); },
   instrument(t, name) {
     audio.setInstrument(t, name);
@@ -177,14 +183,14 @@ const actions = {
 };
 // While jamming no track is selected, so what works on the selected track does nothing (Record
 // can still close a recording that's under way).
-for (const k of ['record', 'clearTrack', 'transpose', 'octave', 'quant', 'nextInstrument', 'nextKit', 'nextMidi', 'nextAudio', 'synth']) {
+for (const k of ['record', 'clearTrack', 'trimTrack', 'transpose', 'octave', 'quant', 'nextInstrument', 'nextKit', 'nextMidi', 'nextAudio', 'synth']) {
   const f = actions[k];
   actions[k] = (...a) => (jam && !(k === 'record' && engine.rec !== 'idle') ? undefined : f(...a));
 }
 
 // ---- the panel (laid out like the Circuit Tracks) ------------------------------------
 
-const levels = { click: 0.5, master: 0.8 };
+const levels = { click: 0.5, master: 0.8, filter: 0.5 };
 try {
   const saved = JSON.parse(localStorage.getItem('levels') ?? 'null');
   if (saved) { levels.master = saved.master ?? levels.master; levels.click = saved.click ?? levels.click; }
@@ -212,9 +218,12 @@ function el(tag, cls, html = '') {
 // A knob: drag up/down or scroll to turn it, double-click for its default.
 // `shift` (optional): a second value the knob turns while Shift is down, -1..1, shown on a small
 // left-right strip under the knob (track knobs: stereo position).
+// `shift`: what it turns with Shift held, shown as a left-right bar under it (track pan), or,
+// with `shift.label`, in place of its own value and label (the filter knob's click level).
 function makeKnob(parent, { label, title, get, set, dflt, shift }) {
+  const bar = shift && !shift.label;
   const k = el('div', 'knob', `<div class="dial"><i></i></div>`
-    + (shift ? '<span class="pan"><i></i><b></b></span>' : `<span class="klabel">${label}</span>`));
+    + (bar ? '<span class="pan"><i></i><b></b></span>' : `<span class="klabel">${label}</span>`));
   k.title = title;
   const dial = k.querySelector('.dial');
   const panned = e => shift && (e.shiftKey || shiftDown());
@@ -235,11 +244,13 @@ function makeKnob(parent, { label, title, get, set, dflt, shift }) {
   }, { passive: false });
   dial.addEventListener('dblclick', e => (panned(e) ? shift.set(shift.dflt) : set(dflt)));
   parent.appendChild(k);
-  const pan = k.querySelector('.pan');
+  const pan = k.querySelector('.pan'), klabel = k.querySelector('.klabel');
   return {
-    el: k, label: k.querySelector('.klabel'),
+    el: k, label: klabel,
     update(color) {
-      dial.style.setProperty('--v', get().toFixed(3));
+      const alt = shift?.label && shiftDown();
+      dial.style.setProperty('--v', (alt ? shift.get() : get()).toFixed(3));
+      if (shift?.label) setText(klabel, alt ? shift.label : label);
       if (pan) pan.style.setProperty('--p', shift.get().toFixed(3));
       if (color) k.style.setProperty('--c', color);
     },
@@ -251,8 +262,9 @@ const masterKnob = makeKnob($('master-vol'), {
   get: () => levels.master, set: actions.masterVolume, dflt: 0.8,
 });
 const clickKnob = makeKnob($('master-int'), {
-  label: 'Click', title: 'The metronome click\'s level. The Circuit\'s master filter knob turns it. Drag or scroll; double-click to reset.',
-  get: () => levels.click, set: actions.clickLevel, dflt: 0.5,
+  label: 'Filter', title: 'Master filter: left closes a low-pass, right opens a high-pass, the middle is off (double-click). With Shift: the click\'s level. The Circuit\'s master filter knob turns both. Drag or scroll',
+  get: () => levels.filter, set: actions.filter, dflt: 0.5,
+  shift: { label: 'Click', get: () => levels.click, set: actions.clickLevel, dflt: 0.5 },
 });
 const volKnobs = [];
 for (let t = 0; t < TRACKS; t++) {
@@ -292,8 +304,8 @@ for (const [row, col, key, def] of [
   [3, 5, 'tempo', { tap: 'Click', shift: 'Swing', shiftHold: true, hold: 'Tempo', act: () => actions.click(),
     title: 'Tap: the metronome (C). Hold + turn the master filter knob (or scroll over it): tempo (↑ ↓). Shift + hold + turn (or Shift + scroll): swing' }],
   // Clear track and Undo sit on the Circuit's Clear and Duplicate buttons.
-  [3, 6, 'clearTrack', { tap: 'Clear track', act: () => (page === 'settings' ? settings.del() : actions.clearTrack()),
-    title: 'Clear the selected track (⌫). In Settings: delete the chosen item' }],
+  [3, 6, 'clearTrack', { tap: 'Clear track', shift: 'Trim', act: e => (page === 'settings' ? settings.del() : shifted(e) ? actions.trimTrack() : actions.clearTrack()),
+    title: 'Tap: clear the selected track (⌫). Shift: trim the blank bars off the end of its loop. In Settings: delete the chosen item' }],
   [3, 7, 'undo', { tap: 'Undo', shift: 'Redo', act: e => (shifted(e) ? actions.redo() : actions.undo()),
     title: 'Tap: undo the last recording (Z). Shift: redo it (⇧Z)' }],
   [3, 8, 'save', { tap: 'Save', shift: 'Template', act: e => (shifted(e) ? session.saveTemplate() : session.save()),
@@ -339,7 +351,7 @@ btn.tempo.addEventListener('wheel', e => {
 // Track buttons, then mute and solo pads under each.
 const tbtns = [];
 for (let t = 0; t < TRACKS; t++) {
-  const b = el('button', 'tbtn', `<span class="tnum">${t + 1}</span><i class="tdot"></i><span class="tinst"><i class="ticon"></i><span class="tname"></span></span><span class="tlen"></span><b class="tq"></b><b class="tfx">FX</b><span class="tpage"></span>`);
+  const b = el('button', 'tbtn', `<span class="tnum">${t + 1}</span><i class="tdot"></i><canvas class="tmini"></canvas><span class="tinst"><i class="ticon"></i><span class="tname"></span></span><span class="tlen"></span><b class="tq"></b><b class="tfx">FX</b><span class="tpage"></span>`);
   b.title = `Track ${t + 1} (${t + 1})`;
   b.addEventListener('click', () => actions.select(t));
   $('trackbar').appendChild(b);
@@ -353,7 +365,7 @@ for (let t = 0; t < TRACKS; t++) {
   so.setAttribute('aria-label', so.title);
   so.addEventListener('click', () => actions.solo(t));
   $('solo-row').appendChild(so);
-  tbtns.push({ el: b, name: b.querySelector('.tname'), len: b.querySelector('.tlen'), dot: b.querySelector('.tdot'), q: b.querySelector('.tq'), fx: b.querySelector('.tfx'), page: b.querySelector('.tpage'), m, s: so });
+  tbtns.push({ el: b, mini: b.querySelector('.tmini'), name: b.querySelector('.tname'), len: b.querySelector('.tlen'), dot: b.querySelector('.tdot'), q: b.querySelector('.tq'), fx: b.querySelector('.tfx'), page: b.querySelector('.tpage'), m, s: so });
 }
 
 const instSelect = $('inst');
@@ -822,7 +834,7 @@ function frame() {
   btn.tempo.classList.toggle('beat', engine.click && engine.playing && b >= 0 && b % 1 < 0.15);
   lcd.show(shiftDown() ? engine.swing : engine.bpm, shiftDown() ? 'SWING' : 'BPM');
   btn.undo.classList.toggle('on', !engine.isEmpty() || engine.canRedo());
-  btn.clearTrack.classList.toggle('on', engine.tracks[sel].notes.length + engine.tracks[sel].clips.length > 0);
+  btn.clearTrack.classList.toggle('on', shiftDown() ? engine.trimLength(sel) > 0 : engine.tracks[sel].notes.length + engine.tracks[sel].clips.length > 0);
   btn.shift.classList.toggle('on', shiftDown());
   document.body.classList.toggle('shift', shiftDown());
   btn.tempo.classList.toggle('holding', app.holding === 'tempo');        // held on the Circuit
@@ -863,6 +875,7 @@ function frame() {
     setText(tb.page, settings.pages[t]?.name ?? '');              // Settings: the page this button picks
     tb.el.classList.toggle('setpage', page === 'settings' && t === settings.page());
     tb.el.classList.toggle('nopage', !settings.pages[t]);
+    if (page !== 'settings') drawMini(tb.mini, engine, t, inst(t).color, isDrums(t));
   });
 
   // The selected track's sequencer

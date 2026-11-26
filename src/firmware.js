@@ -1,15 +1,18 @@
 // Settings › Firmware: puts the looper's firmware (or Novation's own) on the Circuit Tracks, from
-// the screen (the Circuit can't drive this: it's in recovery mode). Only these exact files can be
-// sent (SHA-256 checked); they're built on the dev machine (circuit/build_takeover.py) and served
-// from circuit/build/ and circuit/incoming/, so elsewhere the page says they're missing.
+// the screen (the Circuit can't drive this: it's in recovery mode). Both start from Novation's
+// official 1.2.1 .syx, which we can't redistribute: the user picks their own download (on a dev
+// machine it's also served from circuit/incoming/). Zerkit's LOOP06 is built from it here
+// (fwimage.js) and only sent if its SHA-256 matches the Python build's.
 // Protocol: docs/circuit-protocol.md.
 
+import { sha256, split, buildLoop, STOCK_SHA } from './fwimage.js';
+
 const FILES = [
-  { id: 'loop', label: 'Zerkit', sub: 'LOOP06', url: 'circuit/build/circuittracks-4486-LOOP06.syx',
-    sha: '562f9f39b37345a9f32adc86f7d407efbf1df4edb1fb797bc10ec01a957241bc' },
-  { id: 'stock', label: 'Novation', sub: '1.2.1', url: 'circuit/incoming/circuittracks-firmware-4486.syx',
-    sha: 'bd2d294bafa88fdec7ae1f5fcaaa13158323969c5a40f83405a72e4ad329a0bd' },
+  { id: 'loop', label: 'Zerkit', sub: 'LOOP06' },
+  { id: 'stock', label: 'Novation', sub: '1.2.1' },
 ];
+const LOCAL_STOCK = 'circuit/incoming/circuittracks-firmware-4486.syx';
+const NOVATION_URL = 'https://components.novationmusic.com/api/v2/firmwares/168/file';
 const NOV = [0xF0, 0x00, 0x20, 0x29, 0x00];
 const STATUS = { 0: 'update started', 1: 'press Play on the Circuit', 16: 'cancelled on the Circuit',
   17: 'confirmation timed out', 124: 'failed (not viable)', 125: 'received, checking', 126: 'failed (CRC)', 127: 'done' };
@@ -20,6 +23,7 @@ export function setupFirmware({ onBusy }) {
   let chosen = null, packets = null, xfer = null, progress = 0, phase = '', phaseCls = '';
   const log = [];
   let version = 0, shown = -1, root = null;
+  let stock = null, pending = null;                       // the official .syx, once we have it
   const changed = () => { version++; onBusy?.(mode === 'bootloader' || !!xfer); };
 
   const note = (msg, cls = '') => { log.unshift({ msg, cls }); log.length = Math.min(log.length, 6); changed(); };
@@ -57,30 +61,38 @@ export function setupFirmware({ onBusy }) {
     changed();
   }
 
-  async function sha256(buf) {
-    return [...new Uint8Array(await crypto.subtle.digest('SHA-256', buf))].map(b => b.toString(16).padStart(2, '0')).join('');
+  // The official file: served locally on a dev machine, otherwise picked by the user.
+  async function localStock() {
+    try {
+      const res = await fetch(LOCAL_STOCK, { cache: 'no-store' });
+      if (!res.ok) return null;
+      const buf = await res.arrayBuffer();
+      return (await sha256(buf)) === STOCK_SHA ? buf : null;
+    } catch { return null; }
   }
-  function split(u8) {
-    const msgs = [];
-    for (let i = 0; i < u8.length;) {
-      const s = u8.indexOf(0xF0, i), e = u8.indexOf(0xF7, s);
-      if (s < 0 || e < 0) break;
-      msgs.push(u8.slice(s, e + 1)); i = e + 1;
-    }
-    const cmds = msgs.map(m => m[5]);
-    if (cmds[0] !== 0x71 || cmds[1] !== 0x7C || cmds.at(-1) !== 0x73 || cmds.slice(2, -1).some(c => c !== 0x72)) throw Error('unexpected message order');
-    return msgs;
+  function pickStock(f) {
+    pending = f;
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.syx' });
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const buf = await file.arrayBuffer();
+      if ((await sha256(buf)) !== STOCK_SHA) return note(`${file.name}: not Novation’s 1.2.1 (build 4486) file`, 'bad');
+      stock = buf;
+      if (pending) choose(pending);
+    };
+    input.click();
   }
+
+  localStock().then(buf => { if (buf && !stock) { stock = buf; changed(); } });
 
   async function choose(f) {
     if (mode !== 'bootloader' || xfer) return;
+    if (!stock) return pickStock(f);                      // synchronously: the picker needs the click
     chosen = null; changed();
+    pending = null;
     try {
-      const res = await fetch(f.url, { cache: 'no-store' });
-      if (!res.ok) throw Error('not on this computer');
-      const buf = await res.arrayBuffer();
-      if ((await sha256(buf)) !== f.sha) throw Error('checksum mismatch: not sending it');
-      packets = split(new Uint8Array(buf));
+      packets = split(f.id === 'loop' ? await buildLoop(stock) : new Uint8Array(stock));
       chosen = f;
       changed();
     } catch (e) { note(`${f.label} ${f.sub}: ${e.message}`, 'bad'); }
@@ -145,6 +157,7 @@ export function setupFirmware({ onBusy }) {
         + `<span class="card-name">${f.label}</span><span class="card-use">${f.sub}</span></button>`).join('')}
         ${chosen && !xfer ? `<button class="sr-btn fw-send">Send ${chosen.label}</button>` : ''}
         ${xfer ? '<button class="sr-btn fw-abort">Abort</button>' : ''}</div>
+      ${stock ? '' : `<a class="fw-get" href="${NOVATION_URL}">Novation 1.2.1 .syx ↓</a>`}
       ${phase || xfer ? `<div class="fw-phase ${phaseCls}">${esc(phase)}</div><div class="fw-bar"><i style="width:${(progress * 100).toFixed(1)}%"></i></div>` : ''}
       <div class="fw-log">${log.map(l => `<div class="${l.cls}">${esc(l.msg)}</div>`).join('')}</div>
     </div>`;

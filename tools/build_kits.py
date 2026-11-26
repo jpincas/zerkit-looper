@@ -271,7 +271,11 @@ def main():
             print(f'  {name:10s} {i + 1:2d} {label:14s} {dur:4.2f}s peak {peak:6.1f} dB <- {", ".join(os.path.basename(f) for f, _ in files)}{quiet}')
         json.dump({'format': 'zerkit-kit', 'version': 1, 'name': name, 'pads': out_pads}, open(os.path.join(kdir, 'kit.json'), 'w'), indent=1)
         index.append(name)
-    json.dump(index, open(os.path.join(OUT, 'index.json'), 'w'))
+    # keep the other kits listed (the electronic ones come from tools/synth_kits.py)
+    path = os.path.join(OUT, 'index.json')
+    old = json.load(open(path)) if os.path.exists(path) else []
+    index += [k for k in old if k not in index]
+    json.dump(index, open(path, 'w'))
     print('kits:', index)
 
 

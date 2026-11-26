@@ -13,14 +13,14 @@ a synth, live audio and external MIDI gear. Every track can have its own loop le
 - **Each track keeps its own length.** A one-bar drum loop cycles eight times under an eight-bar
   bass line, all in time.
 - **Five kinds of sound on every track:** sampled instruments (piano, upright bass, cello,
-  vibraphone, harp, or your own), 16-pad drum kits, a subtractive synth with 32 presets, live
+  vibraphone, harp, or your own), 16-pad drum kits (acoustic and electronic), a subtractive synth with 32 presets, live
   audio inputs, and external MIDI instruments.
 - **Make your own instruments.** The looper can sample a hardware synth note by note over MIDI
   and audio, or you can drop in your own recordings. Kits are made by dropping files onto pads.
 - **Eight FX pedals per track:** compressor, drive, filter, chorus, phaser, tremolo, delay and
   reverb, plus 32 presets.
-- **Mixer and timing:** volume, pan, mute and solo per track, swing, per-track record quantise,
-  a metronome and tap tempo.
+- **Mixer and timing:** volume, pan, mute and solo per track, a DJ-style master filter, swing,
+  per-track record quantise, a metronome and tap tempo.
 - **Projects are plain files**: a folder of JSON and WAV on your own computer. There's no account,
   no server and no tracking.
 - **Optional hardware control surface.** With a patched firmware, a Novation Circuit Tracks
@@ -49,7 +49,7 @@ a synth, live audio and external MIDI gear. Every track can have its own loop le
 
 | | |
 | --- | --- |
-| ![The looper with four tracks recorded: the bass track's piano roll, with its 2-bar loop repeated faded over the 4-bar timeline](docs/screenshots/looper.png) | ![A drum track with its 16 kit pads](docs/screenshots/kit.png) |
+| ![The looper with four tracks recorded: the bass track's piano roll, with its 2-bar loop repeated faded over the 4-bar timeline](docs/screenshots/looper.png) | ![A drum track playing the synthesised House kit, with its 16 pads](docs/screenshots/kit.png) |
 | **Looper.** Tracks 1, 2 and 5 loop every 2 bars and track 3 every 4. The selected track's piano roll shows shorter loops repeating, faded. | **Kits.** 16 pads in General MIDI order, so a drum part moves from kit to kit. |
 | ![The FX page: eight pedals with the Tape Echo preset loaded](docs/screenshots/fx.png) | ![The synth page with the Acid preset](docs/screenshots/synth.png) |
 | **FX.** Eight pedals per track, one per Circuit pad column. | **Synth.** A subtractive synth per track: saw, square, sine and noise, a filter, two envelopes and an LFO. |
@@ -158,20 +158,24 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   % while Shift is held; then the project's name, and the ∞ badge, which glows green while the Circuit is
   connected (hover it for the connection's state).
 - **Knobs:** Master volume (everything the looper plays) on the left, a volume knob above each
-  track (with Shift: its left-right position, shown on the strip under it), and Click (the
-  metronome's level) on the right. The Circuit's master volume and master filter knobs turn the
+  track (with Shift: its left-right position, shown on the strip under it), and Filter on the
+  right: a DJ-style master filter (left of the middle a low-pass, right a high-pass; the middle,
+  or a double-click, is off; the click isn't filtered). With Shift it sets the click's level. The Circuit's master volume and master filter knobs turn the
   two outer ones. Drag up/down or scroll to turn; double-click resets.
 - **Row above the tracks:** Play/Hide (the play controls; the Circuit's Scales button) | Octave ▼ ▲
   (Shift: move the selected track's notes an octave), Q (cycles the selected track's record
   quantise; each track button shows its own: Q off, Q 32, Q 16), Tempo (tap: click; hold + filter
-  knob or scroll: tempo; Shift: swing; shows tempo · swing), Clear track, Undo (Shift: redo), Save
+  knob or scroll: tempo; Shift: swing; shows tempo · swing), Clear track (Shift: trim the blank bars
+  off the end of its loop, e.g. after a late Record press), Undo (Shift: redo), Save
   (Shift: save a template), Open (Shift: new project) | Shift (holds for the next press).
 - **Track row:** Instrument (tap: the selected track's next melodic instrument, of those switched
   on; Shift: the Instruments page) | the eight track buttons | Jam, track "0" in dark grey (tap or
   `0`: deselect every track). A small icon by each track's name shows its type: keyboard
   (instrument), pads (kit), saw-and-square (synth), waveform (audio). Each track button shows its
-  instrument (a synth track: its preset), loop length and activity. Click one, press `1`–`8`, or
-  press its Circuit button to select it.
+  instrument (a synth track: its preset), loop length and activity, and a small picture of its
+  loop: its notes (a kit: one row per drum) or its audio, with a playhead, 4 bars at a time
+  (longer loops page as they play). Click one, press `1`–`8`, or press its Circuit button to
+  select it. On the Synth page, the selected track's own button goes back to the loop.
 - **Pages:** the pad area shows the Looper, or another page. Shift + Instrument opens
   **Instruments**: every melodic instrument with a switch for whether Instrument cycles through it
   (and which tracks use it). Shift + Audio opens **Audio**, Shift + MIDI opens **MIDI**.
@@ -240,17 +244,34 @@ every light. The Circuit's own track buttons, pads and knobs then do the jobs th
 > touched, so you should always be able to go back to Novation's official firmware from recovery
 > mode (see below). But there are no guarantees.
 
-### Building the firmware
+### Installing it
 
 Novation's firmware is proprietary, so this repository holds **no firmware**, official or
-patched. You download Novation's official file yourself and the patch builder in `circuit/` makes
-the looper firmware from it on your own computer. The result is byte-for-byte reproducible.
+patched. The looper builds its firmware in your browser from your own copy of Novation's
+official file, and only sends the result if it matches the reproducible build byte for byte.
 
 1. Download the official **Circuit Tracks 1.2.1 (build 4486)** firmware from Novation Components:
    [circuittracks-firmware-4486.syx](https://components.novationmusic.com/api/v2/firmwares/168/file).
-   Save it as `circuit/incoming/circuittracks-firmware-4486.syx`. Its SHA-256 must be
-   `bd2d294bafa88fdec7ae1f5fcaaa13158323969c5a40f83405a72e4ad329a0bd`. The builder refuses any
-   other file.
+   Its SHA-256 is `bd2d294bafa88fdec7ae1f5fcaaa13158323969c5a40f83405a72e4ad329a0bd`; the looper
+   refuses any other file.
+2. Switch the Circuit off. Hold **Scales + Preset + Note** while switching it on. That's recovery
+   mode.
+3. In the looper, open **Settings** (the cog) › **Firmware**, then **Check Circuit**.
+4. Pick **Zerkit (LOOP06)** and choose the file you downloaded. Press **Send**, and press
+   **Play** on the Circuit when asked.
+
+To go back to Novation's firmware, do the same and pick **Novation 1.2.1**.
+
+After switching on, "LOOP" scrolls across the pads until the looper connects.
+
+### Building it yourself
+
+You don't need to: the looper does it in the browser. But the patch is made by the Python
+builders in `circuit/`, and you can check it.
+
+1. Save Novation's file (see above) as `circuit/incoming/circuittracks-firmware-4486.syx`. The
+   builder refuses any other file. (When you run the looper locally, Settings › Firmware reads it
+   from there instead of asking for it.)
 2. Install the disassembler the builder uses to check its patches:
 
    ```bash
@@ -266,33 +287,27 @@ the looper firmware from it on your own computer. The result is byte-for-byte re
    It writes `circuit/build/circuittracks-4486-LOOP06.syx` with SHA-256
    `562f9f39b37345a9f32adc86f7d407efbf1df4edb1fb797bc10ec01a957241bc`. The looper only installs
    a file with exactly that hash.
+4. After changing a builder, regenerate the browser's copy of the patch:
+
+   ```bash
+   .venv/bin/python make_patch.py incoming/circuittracks-firmware-4486.syx
+   ```
+
+   It writes `src/firmware-patch.js`: LOOP06 as edits to Novation's image (the branches into
+   our code, the version mark, and our appended code). It contains none of Novation's bytes.
 
 `circuit/test_*.py` run the patched code in an ARM emulator (Unicorn), so the patches can be
 checked without a Circuit. How it works, the protocol and the button ids are in
 [docs/circuit-protocol.md](docs/circuit-protocol.md).
-
-### Installing it
-
-Because the files stay on your computer, run the looper locally to install firmware (see
-[Running it yourself](#running-it-yourself)).
-
-1. Switch the Circuit off. Hold **Scales + Preset + Note** while switching it on. That's recovery
-   mode.
-2. In the looper, open **Settings** (the cog) › **Firmware**, then **Check Circuit**.
-3. Pick **Zerkit (LOOP06)**, press **Send**, and press **Play** on the Circuit when asked.
-
-To go back to Novation's firmware, do the same and pick **Novation 1.2.1**.
-
-After switching on, "LOOP" scrolls across the pads until the looper connects.
 
 ### What the Circuit does
 
 | Circuit | Looper |
 | --- | --- |
 | Play / Record | Play-stop / record (arm, close, overdub) |
-| Clear | Clear the selected track |
+| Clear / Shift + Clear | Clear the selected track / trim the blank bars off the end of its loop |
 | Duplicate / Shift + Duplicate | Undo the last recording / redo it |
-| Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 |
+| Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 (on the Synth page, the selected track's own button goes back to the loop) |
 | Preset / Shift + Preset | The selected track's next instrument (of those switched on) / Instruments page on and off |
 | Note / Shift + Note | The selected track's next kit (of those switched on) / Kits page on and off |
 | Velocity | Make the selected track a synth track and show its synth / on a synth track: Synth page on and off (knob: a column's main control; hold pad 1-3 + knob: its controls; bottom pad: on/off; Shift + pad: one of 32 presets) |
@@ -310,7 +325,7 @@ After switching on, "LOOP" scrolls across the pads until the looper connects.
 | Projects / Shift + Projects | Open a recent project / new project (both on screen; Play picks) |
 | Mixer | Settings on and off (track buttons: its page; Octave ▲ ▼ or the master filter knob: choose; Play: pick; Clear: delete) |
 | Master volume knob | Master volume |
-| Master filter knob | Click level (hold Tempo: tempo; Shift too: swing) |
+| Master filter knob | Master filter (its light is on while filtering) / with Shift: click level (hold Tempo: tempo; Shift too: swing) |
 
 **Track view** (default):
 
@@ -418,9 +433,11 @@ drag a pad onto another to swap them, ✕ to clear one, name it and **Save kit**
 edit it (saving under a new name makes a copy). Each kit's switch says whether **Kits** (tap)
 cycles through it; the switches are saved with the project. Kits are also in the instrument menu.
 
-Five kits come built in: **Rock, Pop, Jazz** (brushes), **Acoustic** and **Percussion**, made
-from free CC0 sample libraries (see [kits/README.md](kits/README.md)). Editing a built-in kit and
-saving it makes your own copy.
+Nine kits come built in. **Rock, Pop, Jazz** (brushes), **Acoustic** and **Percussion** are made
+from free CC0 sample libraries. **House, Techno, Dubstep** and **DnB** are synthesised from
+scratch by `tools/synth_kits.py` (808/909-style kicks, hats and claps, plus subs, a zap and a
+reverse crash). See [kits/README.md](kits/README.md). Editing a built-in kit and saving it makes
+your own copy.
 
 Your own kits are kept in the projects folder, in `Kits/`, one folder each with its samples copied
 in (`My Kit.zkit/kit.json` and `samples/`), so moving or deleting the original files doesn't
@@ -486,7 +503,8 @@ saved with the project.
 ## Synth tracks
 
 **Synth** (the Circuit's Velocity button) makes the selected track a synth track and opens its
-synth; on a synth track it opens and closes the Synth page. Every track has its own synth
+synth; on a synth track it opens and closes the Synth page (that track's own button closes it too).
+Every track has its own synth
 settings, so eight synth tracks can sound completely different; they're saved with the project
 (kept even while a track plays something else). It's made of Web Audio nodes, like the FX, laid
 out left to right like a synth panel, one column per Circuit pad column:
@@ -522,7 +540,7 @@ refresh.
 ```
 index.html, styles.css   the page
 src/                     the app
-instruments/, kits/      built-in samples (CC0), with their index.json files
+instruments/, kits/      built-in samples (CC0 or synthesised), with their index.json files
 tools/                   dev server, and the scripts that build the built-in samples
 circuit/                 Circuit Tracks firmware patch builders and their emulator tests
 docs/                    the Circuit protocol, MIDI notes, screenshots
@@ -530,33 +548,39 @@ docs/                    the Circuit protocol, MIDI notes, screenshots
 
 - `src/engine.js`: transport, record state machine and lookahead scheduler. It's pure logic
   that talks to an `out` interface.
-- `src/audio.js`: the Web Audio implementation of `out`. It routes each track to its instrument
-  and plays the click.
+- `src/audio.js`: the Web Audio implementation of `out`. It routes each track to its instrument,
+  through the master filter, and plays the click.
 - `src/instruments.js`: the instrument registry and the kit pad layout; `src/audioinst.js` /
   `src/midiinst.js`: audio and MIDI instruments and their pages; `src/cards.js`: the square
   cards every page uses; `src/fx.js` / `src/fxpage.js`: the per-track pedals, and the FX page;
   `src/synth.js` / `src/synthpage.js`: the per-track synth, and the Synth page.
 - `src/projects.js`: the projects folder and the project files; `src/session.js`: the current
   project (saving, opening, new, templates) and its screens; `src/templates.js`: template
-  storage; `src/settings.js`: the Settings pages (`src/firmware.js`: Firmware,
+  storage; `src/settings.js`: the Settings pages (`src/firmware.js`: Firmware, with
+  `src/fwimage.js` building LOOP06 from Novation's file;
   `src/monitor.js`: Monitor, `src/tour.js`: the guide).
 - `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits
   page and kit editor.
 - `src/sampler.js`: sampled instruments (zones, playback, storage); `src/instpage.js`: the
   Instruments page and the instrument maker.
 - `src/circuit.js`: the Circuit Tracks control surface; `src/midiin.js`: MIDI inputs.
-- `src/roll.js`: canvas piano roll (one per track).
+- `src/roll.js`: canvas piano roll (the selected track); `src/mini.js`: the small picture of
+  each loop in its track button.
 - `src/keys.js`: computer-keyboard note mapping.
 - `src/audioin.js`, `src/capture-worklet.js`: audio inputs, captured continuously so takes can be
   cut out of them.
 - `src/main.js`: wiring, shortcuts and the render loop. `window.looper` exposes the app in the
   console for debugging.
 
-**Rebuilding the built-in samples** (needs `ffmpeg`; downloads the source libraries into a cache
-folder that git ignores):
+**Rebuilding the built-in samples** (needs `ffmpeg`; `build_kits.py` and `build_instruments.py`
+download the source libraries into a cache folder that git ignores):
 
 ```bash
 python3 tools/build_kits.py
+```
+
+```bash
+python3 tools/synth_kits.py     # the electronic kits: synthesised, no downloads, byte-for-byte reproducible
 ```
 
 ```bash
@@ -576,7 +600,8 @@ The code is under the [MIT licence](LICENSE).
 
 The built-in kits and instruments come from sample libraries by **Karoryfer Samples** and
 **Versilian Studios** (Big Rusty Drums, Swirly Drums, Virtuosity Drums, VCSL, Osiris Piano,
-Meatbass, and Cello with Bigcat), all released under CC0 1.0. The Circuit Tracks firmware work
+Meatbass, and Cello with Bigcat), all released under CC0 1.0. The electronic kits are synthesised
+by this project's own code. The Circuit Tracks firmware work
 builds on research by the [CIRCUIT-HACKS-RC](https://github.com/Ghillermo/CIRCUIT-HACKS-RC)
 project. Details are in [NOTICE.md](NOTICE.md).
 

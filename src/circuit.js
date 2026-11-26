@@ -151,7 +151,7 @@ export function connectCircuit(app) {
       case BTN.save: return shift ? app.session.saveTemplate() : app.session.save();
       case BTN.open: return shift ? app.session.openTemplate() : app.session.open();            // the Projects button
       case BTN.settings: return actions.togglePage('settings');                                // the Mixer button (the cog)
-      case BTN.clearTrack: return actions.clearTrack();                                        // the Clear button
+      case BTN.clearTrack: return shift ? actions.trimTrack() : actions.clearTrack();          // the Clear button (Shift: trim)
       case BTN.undo: return shift ? actions.redo() : actions.undo();                           // the Duplicate button
       case BTN.jam: return actions.jam();                                                      // the Patterns button
     }
@@ -174,9 +174,9 @@ export function connectCircuit(app) {
     actions.volume(k, delta * 0.02);                 // knob above each track = its volume
   }
 
-  // The master filter knob is the general-purpose knob: what it turns depends on what's held.
-  // It reports a position, so it's used as turns (the change since its last report): that way
-  // changing the tempo doesn't make the click level jump the next time it's turned on its own.
+  // The master filter knob: the master filter; with Shift, the click level; with Tempo held, the
+  // tempo (Shift too: swing). It reports a position, so it's used as turns (the change since its
+  // last report): that way changing the tempo doesn't make the filter jump the next time.
   function filterKnob(pos) {
     const first = lastFilter == null, d = first ? 0 : pos - lastFilter;
     lastFilter = pos;
@@ -184,8 +184,9 @@ export function connectCircuit(app) {
       if (d) { shift ? actions.swing(d) : actions.tempo(d); tempoTurned = true; }
       return;
     }
-    if (first || pos === 0 || pos === 127) return actions.clickLevel(pos / 127);   // first report, end stops: exact
-    if (d) actions.clickLevel(app.levels.click + d / 127);
+    const [get, set] = shift ? [() => app.levels.click, actions.clickLevel] : [() => app.levels.filter, actions.filter];
+    if (first || pos === 0 || pos === 127) return set(pos / 127);   // first report, end stops: exact
+    if (d) set(get() + d / 127);
   }
 
   // ---- lights ----------------------------------------------------------------
@@ -227,7 +228,7 @@ export function connectCircuit(app) {
       overdub: C.amber,
     }[engine.rec];
     f[ledBtn(BTN.undo)] = (shift ? engine.canRedo() : !engine.isEmpty()) ? C.white : C.off;   // something to undo / redo
-    f[ledBtn(BTN.clearTrack)] = engine.tracks[sel].notes.length + engine.tracks[sel].clips.length ? C.white : C.off;   // something to clear
+    f[ledBtn(BTN.clearTrack)] = (shift ? engine.trimLength(sel) : engine.tracks[sel].notes.length + engine.tracks[sel].clips.length) ? C.white : C.off;   // something to clear / trim
     f[ledBtn(BTN.settings)] = C.dim;
     const onBeat = engine.playing && b >= 0 && b % 1 < 0.15;
     f[ledBtn(BTN.tempo)] = tempoHeld ? C.white : engine.click ? (onBeat ? C.white : C.dim) : C.off;
@@ -241,7 +242,7 @@ export function connectCircuit(app) {
         : app.knobPage() ? app.knobPage().codes()[t]            // FX / Synth page: each column's colour
         : audio.vol[t] > 0 ? instCode(t) : C.off;
     }
-    f[KNOB_LED + 8] = tempoHeld ? (shift ? C.amber : C.white) : C.off;
+    f[KNOB_LED + 8] = tempoHeld ? (shift ? C.amber : C.white) : app.levels.filter !== 0.5 ? C.white : C.off;   // lit: filtering
 
     const cards = app.pageCards();
     if (cards) pageLights(f, cards);

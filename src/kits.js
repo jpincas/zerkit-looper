@@ -58,6 +58,7 @@ const ABBR = {
   tambourine: 'Tamb', cowbell: 'Cowb', shaker: 'Shk', muted: 'Mut', edge: 'Edg', brush: 'Br', stir: 'Stir',
   dig: 'Dig', conga: 'Cga', tumba: 'Tmb', bongo: 'Bgo', timbale: 'Timb', woodblock: 'WBlk', claves: 'Clv',
   agogo: 'Agg', guiro: 'Gro', cabasa: 'Cab', triangle: 'Tri', darbuka: 'Darb', cajon: 'Caj', snap: 'Snp',
+  noise: 'Nz', ghost: 'Gh', crunch: 'Crn', reverse: 'Rev', rumble: 'Rmbl', drop: 'Drp',
 };
 export function abbreviate(label) {
   const parts = label.split(/[\s_-]+/).filter(Boolean).map(w => ABBR[w.toLowerCase()] ?? (/^\d+$/.test(w) ? w : w.slice(0, 4)));

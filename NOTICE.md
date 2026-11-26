@@ -19,6 +19,10 @@ required, but they deserve it:
 
 `tools/build_kits.py` and `tools/build_instruments.py` rebuild them from the original repositories.
 
+The electronic kits (House, Techno, Dubstep, DnB) use no samples: `tools/synth_kits.py` synthesises
+every sound, so they're this project's own work under its MIT licence. Its reverb follows
+Jezar's public-domain Freeverb design.
+
 ## Circuit Tracks firmware research
 
 The firmware update format, the input handlers' addresses, the button ids and the free RAM region
