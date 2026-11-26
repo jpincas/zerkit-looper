@@ -991,6 +991,13 @@ const app = {
 };
 connectCircuit(app);
 window.looper = app; // for debugging from the console
+
+// The release, in the GitHub link's tooltip (version.json says "dev" here; the release workflow
+// writes the tag into it).
+fetch('version.json', { cache: 'no-store' }).then(r => r.json()).then(({ version }) => {
+  const gh = document.querySelector('.gh');
+  if (gh && version) gh.title = `Source code on GitHub · ${version}`;
+}).catch(() => {});
 // ---- what's on screen, in the address ------------------------------------------------
 // #<track>[/<page>[/<settings page>]][/keys], e.g. #3/fx, #1/settings/midi, #0 (Jam), #2/keys, so
 // a refresh comes back to the same view. Replaced as it changes, so Back still leaves the looper.

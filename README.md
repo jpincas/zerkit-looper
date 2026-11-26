@@ -587,6 +587,17 @@ python3 tools/synth_kits.py     # the electronic kits: synthesised, no downloads
 python3 tools/build_instruments.py
 ```
 
+**Releasing.** Work happens on `main`; pushing to it doesn't change the live site. A release is
+a tag: pushing one runs [.github/workflows/release.yml](.github/workflows/release.yml), which
+publishes that exact version to zerkit.jonathanpincas.com. The version shows in the GitHub
+icon's tooltip.
+
+```bash
+git tag v0.2 && git push origin v0.2
+```
+
+To put an older release back live, run the Release workflow from the Actions tab with its tag.
+
 More notes: [docs/circuit-protocol.md](docs/circuit-protocol.md) (the control-surface protocol
 and firmware patches), [docs/circuit-tracks-midi.md](docs/circuit-tracks-midi.md) (what a stock
 Circuit Tracks sends over MIDI), [docs/cp88-midi.md](docs/cp88-midi.md) (a retired experiment

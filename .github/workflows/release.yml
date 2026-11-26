@@ -1,0 +1,61 @@
+# Publishes a release to GitHub Pages (zerkit.jonathanpincas.com).
+#
+# Work on main as usual: pushing to main never changes the live site. To release, tag a commit
+# and push the tag:
+#
+#     git tag v0.2 && git push origin v0.2
+#
+# To put an older release back live: Actions > Release > Run workflow, and give its tag.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish (e.g. v0.1)
+        required: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check the tag
+        run: |
+          [[ "$TAG" =~ ^v[0-9][0-9A-Za-z.-]*$ ]] || { echo "Not a release tag: $TAG"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - name: Build the site
+        run: |
+          mkdir _site
+          git archive HEAD | tar -x -C _site
+          rm -rf _site/.github
+          printf '{"version": "%s"}\n' "$TAG" > _site/version.json
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
