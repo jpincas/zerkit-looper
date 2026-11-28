@@ -32,7 +32,7 @@ const STEPS = [
   { target: ['#mute-row, #solo-row'], title: 'Mute and solo', text: 'One of each under every track.',
     circuit: 'Pad row 1 mutes (red), row 2 solos (green).' },
   { target: ['#master-vol', '#master-int', '#knobs'], title: 'Volume', text: 'A knob per track: drag or scroll. With Shift: left-right position. Double-click resets. Left of them the overall volume, right a master filter (Shift: the click’s level).',
-    circuit: 'The knob above each track, with Shift for position. Master volume: overall. Master filter: the filter, with Shift the click.' },
+    circuit: 'The knob above each track, with Shift for position. Master volume: overall. Master filter: the filter (its centre detent is off), with Shift the click.' },
   { target: ['.pbtn.undo, .pbtn.clearTrack'], title: 'Undo and clear', text: 'Undo (Z) takes off the last take or overdub, Shift redoes it. Clear track (⌫) empties the selected track; Shift trims empty bars off the end of its loop.',
     circuit: 'Duplicate undoes, Shift + Duplicate redoes. Clear empties the track, Shift + Clear trims it.' },
   { target: ['.pbtn.quant, .pbtn.tempo'], title: 'Timing', text: 'Q snaps what you record on this track to 32nds or 16ths. Click switches the metronome; hold it and scroll for tempo, with Shift for swing.',

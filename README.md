@@ -329,7 +329,7 @@ checked without a Circuit. How it works, the protocol and the button ids are in
 | Projects / Shift + Projects | Open a recent project / new project (both on screen; Play picks) |
 | Mixer | Settings on and off (track buttons: its page; Octave ▲ ▼ or the master filter knob: choose; Play: pick; Clear: delete) |
 | Master volume knob | Master volume |
-| Master filter knob | Master filter (its light is on while filtering) / with Shift: click level (hold Tempo: tempo; Shift too: swing) |
+| Master filter knob | Master filter, following the knob: its centre detent is off (its light is on while filtering) / with Shift: click level (hold Tempo: tempo; Shift too: swing). After those, or after moving the filter on screen, the filter picks up again when the knob comes round to it |
 
 **Track view** (default):
 

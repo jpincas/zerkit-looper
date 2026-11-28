@@ -174,19 +174,31 @@ export function connectCircuit(app) {
     actions.volume(k, delta * 0.02);                 // knob above each track = its volume
   }
 
-  // The master filter knob: the master filter; with Shift, the click level; with Tempo held, the
-  // tempo (Shift too: swing). It reports a position, so it's used as turns (the change since its
-  // last report): that way changing the tempo doesn't make the filter jump the next time.
+  // The master filter knob. The filter follows its position, so the centre detent is always "off"
+  // (and the ends are the deepest low- and high-pass). With Shift it turns the click level, with
+  // Tempo held the tempo (Shift too: swing): those are turns, the change since its last report.
+  // After them, or after the filter was moved on screen, the knob no longer points where the
+  // filter is, so the filter picks up only once the knob comes round to it: nothing jumps.
+  let knobFilter = null;                         // the filter value the knob last set (null: out of step)
   function filterKnob(pos) {
-    const first = lastFilter == null, d = first ? 0 : pos - lastFilter;
+    const prev = lastFilter, d = prev == null ? 0 : pos - prev;
     lastFilter = pos;
     if (tempoHeld) {
-      if (d) { shift ? actions.swing(d) : actions.tempo(d); tempoTurned = true; }
+      if (d) { shift ? actions.swing(d) : actions.tempo(d); tempoTurned = true; knobFilter = null; }
       return;
     }
-    const [get, set] = shift ? [() => app.levels.click, actions.clickLevel] : [() => app.levels.filter, actions.filter];
-    if (first || pos === 0 || pos === 127) return set(pos / 127);   // first report, end stops: exact
-    if (d) set(get() + d / 127);
+    if (shift) {
+      knobFilter = null;
+      if (prev == null || pos === 0 || pos === 127) return actions.clickLevel(pos / 127);   // first report, end stops: exact
+      if (d) actions.clickLevel(app.levels.click + d / 127);
+      return;
+    }
+    if (prev != null && knobFilter !== app.levels.filter) {          // out of step: wait for the pick-up
+      const at = app.levels.filter * 127;                            // where the filter is, as a knob position
+      if (Math.abs(pos - at) > 2 && (prev - at) * (pos - at) > 0) return;   // not reached or crossed yet
+    }
+    actions.filter(pos / 127);
+    knobFilter = app.levels.filter;
   }
 
   // ---- lights ----------------------------------------------------------------
