@@ -25,7 +25,7 @@ Jezar's public-domain Freeverb design.
 
 ## Grooves (CC BY 4.0)
 
-Twelve of the grooves (`src/grooves-data.js`: Rock to Hip-hop) are excerpts of performances from
+24 of the grooves (`src/grooves-data.js`: the first three rows) are excerpts of performances from
 the **Groove MIDI Dataset** by Jon Gillick, Adam Roberts, Jesse Engel, Douglas Eck and David
 Bamman (Google Magenta), released under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
@@ -36,7 +36,7 @@ where swung, written straight for the looper's Swing to play. `tools/build_groov
 > Jon Gillick, Adam Roberts, Jesse Engel, Douglas Eck, and David Bamman. "Learning to Groove with
 > Inverse Sequence Transformations." International Conference on Machine Learning (ICML), 2019.
 
-The electronic grooves (House, Techno, Dubstep, DnB) are programmed in that script: this
+The electronic grooves (the fourth row) are programmed in that script: this
 project's own work.
 
 ## Circuit Tracks firmware research

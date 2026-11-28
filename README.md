@@ -19,7 +19,7 @@ a synth, live audio and external MIDI gear. Every track can have its own loop le
   and audio, or you can drop in your own recordings. Kits are made by dropping files onto pads.
 - **Eight FX pedals per track:** compressor, drive, filter, chorus, phaser, tremolo, delay and
   reverb, plus 32 presets.
-- **16 drum grooves to start from**, most played by real drummers: rock, pop, folk, jazz, funk
+- **32 drum grooves to start from**, most played by real drummers: rock, pop, folk, jazz, funk
   and electronic, each setting its tempo and swing, with a fill on the Jam button.
 - **Mixer and timing:** volume, pan, mute and solo per track, a DJ-style master filter, swing,
   per-track record quantise, a metronome and tap tempo.
@@ -312,7 +312,7 @@ checked without a Circuit. How it works, the protocol and the button ids are in
 | Duplicate / Shift + Duplicate | Undo the last recording / redo it |
 | Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 (on the Synth page, the selected track's own button goes back to the loop) |
 | Preset / Shift + Preset | The selected track's next instrument (of those switched on) / Instruments page on and off |
-| Note / Shift + Note | The selected track's next kit (of those switched on) / Kits page on and off (hold Shift there: pads 1-16 are the grooves) |
+| Note / Shift + Note | The selected track's next kit (of those switched on) / Kits page on and off (hold Shift there: all 32 pads are the grooves) |
 | Velocity | Make the selected track a synth track and show its synth / on a synth track: Synth page on and off (knob: a column's main control; hold pad 1-3 + knob: its controls; bottom pad: on/off; Shift + pad: one of 32 presets) |
 | Gate / Shift + Gate | The selected track's next audio instrument / Audio page on and off |
 | Pattern Settings / Shift + Pattern Settings | The selected track's next MIDI instrument / MIDI page on and off |
@@ -448,10 +448,17 @@ matter. A project refers to its kits by name.
 
 ### Grooves
 
-Hold **Shift** on the Kits page and the kits give way to 16 drum grooves, four of each kind, each
-kind in its own colour: pop, rock and blues (Rock, Pop, Motown, Shuffle); acoustic and folk
-(Ballad, Country, Indie folk, Bossa nova); jazz and funk (Swing, Funk, Purdie, Hip-hop); and
-electronic (House, Techno, Dubstep, DnB). Tap one, or its pad on the Circuit, and it becomes the
+Hold **Shift** on the Kits page and the kits give way to 32 drum grooves, a row of eight of each
+kind, each kind in its own colour (on the Circuit, all 32 pads):
+
+| Row | Grooves |
+| --- | --- |
+| Pop, rock and blues | Rock, Pop, Uptempo, Stomp, Funk rock, Strut (swung rock), Boogie (rock shuffle), Shuffle (slow blues) |
+| Acoustic and folk | Folk, Country, Steppers (reggae), Afrobeat, Latin pop, Samba (samba-reggae), Latin, Bossa nova |
+| Jazz and funk | Funk, Deep funk, NOLA (New Orleans funk), Neo soul, Hip-hop, Boom bap, Purdie (shuffle), Swing |
+| Electronic | House, UK garage, Techno, Electro, Breakbeat, DnB, Dubstep, Trap |
+
+Tap one, or its pad on the Circuit, and it becomes the
 selected track's loop, 2 bars long, in place of what was there. It brings its kit, sets the
 tempo and swing it was played at, and turns the click off; stopped, the looper starts so you hear it. Undo takes it off.
 
@@ -463,12 +470,14 @@ green while a fill is armed and flashes with the fill's hits as it plays. More t
 armed do nothing, and tapping Jam never takes you out of Jam (pick a track for that). It plays on
 every track holding a groove.
 
-The first twelve are real performances from Magenta's
+The first three rows are real performances from Magenta's
 [Groove MIDI Dataset](https://magenta.tensorflow.org/datasets/groove) (CC BY 4.0): drummers playing
-an electronic kit to a click. `tools/build_grooves.py` takes the most typical 2 bars of each
-performance as the groove, and for the fill the bar the drummer played just before a crash. The
-timing is the drummer's own: where they swing 16ths, the notes are written straight and the
-groove sets Swing to match, so turning Swing still works. The electronic four are programmed.
+an electronic kit to a click, chosen for a pocket you can play over (mid tempos, quiet ghost notes
+rather than busy cymbals). `tools/build_grooves.py` takes the most typical 2 bars of each
+performance as the groove, and for the fill the end of a bar the drummer played just before a
+crash. The timing is the drummer's own: where they swing 16ths, the notes are written straight and
+the groove sets Swing to match, so turning Swing still works. The electronic row is programmed,
+each groove for its own kit.
 
 ## Audio tracks
 
@@ -646,7 +655,7 @@ The code is under the [MIT licence](LICENSE).
 The built-in kits and instruments come from sample libraries by **Karoryfer Samples** and
 **Versilian Studios** (Big Rusty Drums, Swirly Drums, Virtuosity Drums, VCSL, Osiris Piano,
 Meatbass, and Cello with Bigcat), all released under CC0 1.0. The electronic kits are synthesised
-by this project's own code. Twelve of the grooves are performances from the
+by this project's own code. 24 of the grooves are performances from the
 [Groove MIDI Dataset](https://magenta.tensorflow.org/datasets/groove) by Google Magenta, under CC BY 4.0. The Circuit Tracks firmware work
 builds on research by the [CIRCUIT-HACKS-RC](https://github.com/Ghillermo/CIRCUIT-HACKS-RC)
 project. Details are in [NOTICE.md](NOTICE.md).

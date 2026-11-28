@@ -117,7 +117,7 @@ export function connectCircuit(app) {
   function padDown(p, vel) {
     audio.resume();
     const cards = app.pageCards();                     // a page is open: its pads (cards, or the FX pedals)
-    if (cards) { if (cards.press) cards.press(p); else if (p < 16) cards.toggleAt(p); return; }
+    if (cards) { if (cards.press) cards.press(p); else if (p < (cards.max ?? 16)) cards.toggleAt(p); return; }
     if (isNoteMode()) {
       const s = app.isDrums(engine.selected) ? kitPadAt(p) : noteModeSemitone(p);
       if (s != null) return app.press(`circuit${p}`, s, Math.max(1, vel));
@@ -287,7 +287,7 @@ export function connectCircuit(app) {
     }
   }
 
-  // A page's cards on pads 1-16: the instrument's colour when switched on, dim when off, white
+  // A page's cards on pads 1-16 (the grooves: 1-32): the instrument's colour when switched on, dim when off, white
   // for the selected track's own.
   function pageLights(f, cards) {
     cards.state().forEach((c, i) => { if (c) f[i] = c.current ? C.white : c.on ? (c.code ?? codeFor(c.key)) : C.dim; });

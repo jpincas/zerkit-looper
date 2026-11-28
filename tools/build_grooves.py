@@ -16,6 +16,10 @@ turning Swing still works. Eighth-note swing (jazz, shuffles) stays in the notes
 
 The electronic row is programmed here (a drum machine plays to the grid anyway).
 
+32 of them, eight to a row (one row per kind, as on the Circuit's 32 pads). The picks favour
+grooves with a pocket and room to play over: mid tempos, quiet ghost notes rather than loud
+cymbal patterns, which made the busiest ones (and the slowest) sound like clutter.
+
     python3 -m venv /tmp/gv && /tmp/gv/bin/pip install mido
     curl -LO https://storage.googleapis.com/magentadata/datasets/groove/groove-v1.0.0-midionly.zip
     unzip groove-v1.0.0-midionly.zip
@@ -27,6 +31,7 @@ from pathlib import Path
 import mido
 
 BPB = 4
+FILL = 2          # beats of the fill bar the looper plays: its end (src/engine.js)
 OUT = Path(__file__).resolve().parent.parent / 'src' / 'grooves-data.js'
 
 # The drummers' kit (Roland TD-11) onto our pads' General MIDI notes.
@@ -46,16 +51,28 @@ TOMS = {41, 45, 47}
 PICKS = [
     (0, 'Rock', 'drummer3/session1/1_rock_105_beat_4-4.mid', 'Rock'),
     (0, 'Pop', 'drummer7/session2/103_pop_132_beat_4-4.mid', 'Pop'),
-    (0, 'Motown', 'drummer7/session2/54_soul-motown_148_beat_4-4.mid', 'Pop'),
+    (0, 'Uptempo', 'drummer7/session2/104_pop_132_beat_4-4.mid', 'Rock'),
+    (0, 'Stomp', 'drummer8/session1/28_rock_102_beat_4-4.mid', 'Rock'),
+    (0, 'Funk rock', 'drummer1/session2/90_funk-rock_92_beat_4-4.mid', 'Pop'),
+    (0, 'Strut', 'drummer8/session2/22_rock_96_beat_4-4.mid', 'Rock'),
+    (0, 'Boogie', 'drummer8/session1/21_rock-shuffle_112_beat_4-4.mid', 'Rock'),
     (0, 'Shuffle', 'drummer5/session1/17_blues-shuffle_72_beat_4-4.mid', 'Rock'),
-    (1, 'Ballad', 'drummer7/session3/11_pop-soft_83_beat_4-4.mid', 'Acoustic'),
+    (1, 'Folk', 'drummer7/session1/11_rock_93_beat_4-4.mid', 'Acoustic'),
     (1, 'Country', 'drummer7/session2/80_country_78_beat_4-4.mid', 'Acoustic'),
-    (1, 'Indie folk', 'drummer8/session2/40_rock-indie_104_beat_4-4.mid', 'Acoustic'),
+    (1, 'Steppers', 'drummer5/session2/5_reggae_126_beat_4-4.mid', 'Acoustic'),
+    (1, 'Afrobeat', 'drummer8/session2/13_afrobeat_103_beat_4-4.mid', 'Acoustic'),
+    (1, 'Latin pop', 'drummer8/session2/8_latin_95_beat_4-4.mid', 'Acoustic'),
+    (1, 'Samba', 'drummer5/session1/11_latin-brazilian-sambareggae_96_beat_4-4.mid', 'Acoustic'),
+    (1, 'Latin', 'drummer8/session1/13_latin_118_beat_4-4.mid', 'Acoustic'),
     (1, 'Bossa nova', 'drummer5/session1/1_latin-brazilian-bossa_127_beat_4-4.mid', 'Acoustic'),
-    (2, 'Swing', 'drummer1/session1/48_jazz_93_beat_4-4.mid', 'Jazz'),
     (2, 'Funk', 'drummer7/session2/72_funk_100_beat_4-4.mid', 'Pop'),
-    (2, 'Purdie', 'drummer1/session1/239_funk-purdieshuffle_130_beat_4-4.mid', 'Pop', 1),
+    (2, 'Deep funk', 'drummer8/session2/15_funk_95_beat_4-4.mid', 'Pop'),
+    (2, 'NOLA', 'drummer5/session2/10_neworleans-funk_102_beat_4-4.mid', 'Pop'),
+    (2, 'Neo soul', 'drummer7/session3/133_soul_105_beat_4-4.mid', 'Pop'),
     (2, 'Hip-hop', 'drummer7/session2/87_hiphop_75_beat_4-4.mid', 'Pop'),
+    (2, 'Boom bap', 'drummer8/session2/9_hiphop_86_beat_4-4.mid', 'Pop'),
+    (2, 'Purdie', 'drummer1/session1/239_funk-purdieshuffle_130_beat_4-4.mid', 'Pop', 1),
+    (2, 'Swing', 'drummer1/session1/48_jazz_93_beat_4-4.mid', 'Jazz'),
 ]
 
 
@@ -157,12 +174,14 @@ def extract(path, nudge=0):
     swing = swing_of(groove)
 
     # The fill: a bar followed by a crash on the next downbeat, as unlike the groove as can be.
-    typical = [features(window(groove, i * BPB, BPB), BPB) for i in (0, 1)]
+    # Only its last FILL beats play (the looper's fill is the end of the loop), so that's the part
+    # compared with the groove's own last FILL beats of a bar.
+    typical = [features(window(groove, i * BPB + BPB - FILL, FILL), FILL) for i in (0, 1)]
     landed = lambda bar: [(b, n, v) for b, n, v in window(notes, (bar + 1) * BPB, 0.25) if n in CYMBAL]
     cands = [bar for bar in range(2, bars - 2) if landed(bar)] or list(range(2, bars - 2))
     def score(bar):
-        w = window(notes, bar * BPB, BPB)
-        return min(dist(features(w, BPB), t) for t in typical) + 0.03 * sum(n in TOMS or n == 38 for _, n, _ in w)
+        w = window(notes, bar * BPB + BPB - FILL, FILL)
+        return min(dist(features(w, FILL), t) for t in typical) + 0.03 * sum(n in TOMS or n == 38 for _, n, _ in w)
     fbar = max(cands, key=score)
     fill = window(notes, fbar * BPB, BPB) + [(b + BPB, n, v) for b, n, v in landed(fbar)]
     return bpm, swing, pack(groove, swing, 2 * BPB), pack(fill, swing, BPB + 1)
@@ -171,15 +190,21 @@ def extract(path, nudge=0):
 # ---- the electronic row, programmed: one character per 16th, '.' = rest, 1-9 = velocity ----
 
 def grid(parts, length):
+    """One character per step, '.' a rest, 1-9 a hit's velocity. Steps are 16ths, or 32nds for a
+    part written twice as long (hi-hat rolls)."""
     out = []
     for note, steps in parts:
         steps = steps.replace(' ', '')
-        assert len(steps) == length * 4, (note, len(steps))
+        div = len(steps) // length
+        assert div in (4, 8) and len(steps) == length * div, (note, len(steps))
         for i, c in enumerate(steps):
             if c != '.':
-                out.append([i / 4, note, min(127, int(c) * 14)])
+                out.append([i / div, note, min(127, int(c) * 14)])
     return sorted(out)
 
+# Each: (name, bpm, swing, kit, groove parts, fill parts). Written against each kit's own pads
+# (the electronic kits put a sub, a zap or a noise snare where the acoustic ones have toms). A fill
+# part's 17th character is its landing, on the next downbeat.
 ELECTRONIC = [
     ('House', 124, 56, 'House', [
         (36, '9...9...9...9... 9...9...9...9...'),
@@ -192,6 +217,21 @@ ELECTRONIC = [
         (39, '....8.......8...'),
         (38, '........45566789'),
         (46, '..7...7.........'),
+        (49, '................9'),
+    ]),
+    ('UK garage', 132, 62, 'House', [
+        (36, '9.........9..... 9......8..9.....'),
+        (39, '....9.......9... ....9.......9...'),
+        (37, '.......4.......4 ...4...........4'),
+        (42, '..5...5.5.5...5. ..5...5.5.5...55'),
+        (46, '................ ..............6.'),
+    ], [
+        (36, '9.........9.....'),
+        (39, '....9...........'),
+        (38, '........4.5.6.78'),
+        (45, '.........6......'),
+        (43, '...........6....'),
+        (41, '.............6.6'),
         (49, '................9'),
     ]),
     ('Techno', 130, 50, 'Techno', [
@@ -208,6 +248,45 @@ ELECTRONIC = [
         (41, '..........5..5.5'),
         (49, '................9'),
     ]),
+    ('Electro', 120, 50, 'Techno', [
+        (36, '9......9..9..... 9......9..9...9.'),
+        (39, '....9.......9... ....9.......9...'),
+        (42, '4.6.4.6.4.6.4.6. 4.6.4.6.4.6.4.66'),
+        (56, '..5.....5...5... ..5.....5.....5.'),
+    ], [
+        (36, '9......9........'),
+        (39, '....9...........'),
+        (38, '........5.6.7.89'),
+        (45, '.........6......'),
+        (41, '..........6..6.6'),
+        (49, '................9'),
+    ]),
+    ('Breakbeat', 130, 54, 'DnB', [
+        (36, '9.........9..... 9.....9...9.....'),
+        (38, '....9.......9... ....9.......9..4'),
+        (40, '.......2.....2.. .2.....2........'),
+        (42, '6.4.6.4.6.4.6.4. 6.4.6.4.6.4.6.4.'),
+    ], [
+        (36, '9.........9.....'),
+        (38, '....9...7.7.8.88'),
+        (43, '.........6......'),
+        (45, '...........6....'),
+        (42, '6.4.6.4.........'),
+        (49, '................9'),
+    ]),
+    ('DnB', 174, 50, 'DnB', [
+        (36, '9.........8..... 9.........8.7...'),
+        (38, '....9.......9... ....9.......9...'),
+        (40, '.......2.2.....2 ..2....2.2......'),
+        (42, '6.4.6.4.6.4.6.4. 6.4.6.4.6.4.6.46'),
+    ], [
+        (36, '9.........8.....'),
+        (38, '....9...6.6.7788'),
+        (45, '.........7......'),
+        (43, '...........7.7.7'),
+        (42, '6.4.6.4.........'),
+        (49, '................9'),
+    ]),
     ('Dubstep', 140, 50, 'Dubstep', [
         (36, '9.........7..... 9.....7...7.....'),
         (38, '........9....... ........9.......'),
@@ -215,25 +294,22 @@ ELECTRONIC = [
         (46, '..............6. ......6.......6.'),
     ], [
         (36, '9.........7.....'),
-        (38, '........9..4.4.5'),
-        (45, '............7...'),
-        (41, '..............77'),
+        (38, '........9.556677'),
+        (45, '..........7..7..'),
         (42, '5.4.5.4.........'),
         (49, '................9'),
     ]),
-    ('DnB', 174, 50, 'DnB', [
-        (36, '9.........8..... 9.........8.7...'),
-        (38, '....9.......9... ....9.......9...'),
-        (40, '.......3.3.....3 ..3....3.3......'),
-        (42, '6.4.6.4.6.4.6.4. 6.4.6.4.6.4.6.46'),
-        (46, '..............5. ..............5.'),
+    ('Trap', 140, 50, 'Dubstep', [
+        (36, '9............... 9...............'),
+        (41, '9......7..9..... 9.........7.....'),
+        (39, '........9....... ........9.......'),
+        (42, '5.3.5.3.5.3.5.3.5.3.5.3.5.3.4444 5.3.5.3.5.3.55555.3.5.3.4.4.4.4.'),
     ], [
-        (36, '9.........8.....'),
-        (38, '....9...6.6.7788'),
-        (47, '.........7......'),
-        (45, '...........7....'),
-        (41, '.............7.7'),
-        (42, '6.4.6.4.........'),
+        (36, '9...............'),
+        (41, '9.....7.........'),
+        (39, '........9.......'),
+        (38, '..........4.5.67'),
+        (45, '...........7..7.'),
         (49, '................9'),
     ]),
 ]

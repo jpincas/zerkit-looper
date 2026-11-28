@@ -82,18 +82,19 @@ def peak_db(path):
     return float(re.search(r'max_volume: (-?[\d.]+) dB', probe).group(1))
 
 
-def render(sources, out, max_len):
-    """sources: [(local file, gain)] mixed together -> out (FLAC). Returns the mix's peak (dBFS)
-    before normalising, so very quiet sources can be spotted."""
+def render(sources, out, max_len, level=0):
+    """sources: [(local file, gain)] mixed together -> out (FLAC), normalised to -1 dBFS and then
+    moved by `level` dB. Returns the mix's peak (dBFS) before normalising, so very quiet sources
+    can be spotted."""
     mixed, trimmed = out + '.mix.wav', out + '.trim.wav'
     ins = sum((['-i', f] for f, _ in sources), [])
     chains = ''.join(f'[{i}]aformat=sample_rates=48000:channel_layouts=stereo,volume={g}[a{i}];' for i, (_, g) in enumerate(sources))
     mix = ''.join(f'[a{i}]' for i in range(len(sources))) + f'amix=inputs={len(sources)}:normalize=0:duration=longest'
     subprocess.run(['ffmpeg', '-v', 'error', '-y', *ins, '-filter_complex', chains + mix, '-c:a', 'pcm_f32le', mixed], check=True)
     peak = peak_db(mixed)
-    # Normalise to -1 dBFS, then trim the tail below -60 dB of that, cap the length.
+    # Normalise to -1 dBFS (and the pad's level), then trim the tail below -60 dB of that, cap the length.
     trim = 'areverse,silenceremove=start_periods=1:start_threshold=-60dB:start_silence=0.03:detection=peak,areverse'
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', mixed, '-af', f'volume={-1 - peak}dB,{trim},atrim=end={max_len}', '-c:a', 'pcm_f32le', trimmed], check=True)
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', mixed, '-af', f'volume={-1 - peak + level}dB,{trim},atrim=end={max_len}', '-c:a', 'pcm_f32le', trimmed], check=True)
     dur = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', trimmed], capture_output=True, text=True).stdout)
     fade = min(0.06, dur / 4)
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', trimmed, '-af', f'afade=t=out:st={dur - fade:.4f}:d={fade:.4f}',
@@ -109,6 +110,15 @@ def render(sources, out, max_len):
 # snare 2, toms low to high, crash, ride, tambourine, cowbell) so parts move between kits.
 
 DRUM, CYM = 1.6, 4.0
+
+# Pad levels (dB, after normalising) where normalising every sample to the same peak puts the kit
+# out of balance. The Jazz kit's samples carry their room, so they sustain: at the same peak its
+# hats and cymbals came out as loud as the kick, harsh under a groove. These bring them down to
+# about where the other acoustic kits' hats and cymbals sit (-20 to -25 dB RMS, kicks -9 to -12).
+LEVEL = {
+    'Jazz': {'Closed HH': -10, 'Foot HH': -9, 'Open HH': -6, 'Ride': -9, 'Crash': -6, 'Splash': -6,
+             'Brush Stir': -4, 'Cowbell': -6},
+}
 VCSL_S = 'Idiophones/Struck Idiophones'
 VCSL_M = 'Membranophones/Struck Membranophones'
 
@@ -265,7 +275,7 @@ def main():
                 path = resolve(repo, folder, stem)
                 files.append((fetch(repo, path), gain))
             fname = f'{i + 1:02d}-{re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")}.flac'
-            peak, dur = render(files, os.path.join(kdir, 'samples', fname), max_len)
+            peak, dur = render(files, os.path.join(kdir, 'samples', fname), max_len, LEVEL.get(name, {}).get(label, 0))
             out_pads.append({'file': fname, 'label': label})
             quiet = '   QUIET SOURCE' if peak < -24 else ''
             print(f'  {name:10s} {i + 1:2d} {label:14s} {dur:4.2f}s peak {peak:6.1f} dB <- {", ".join(os.path.basename(f) for f, _ in files)}{quiet}')

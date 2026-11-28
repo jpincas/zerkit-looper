@@ -11,7 +11,7 @@ Five are built by `tools/build_kits.py` from free sample libraries, all released
 | --- | --- |
 | Rock | [Big Rusty Drums](https://github.com/sfzinstruments/karoryfer.big-rusty-drums) by Karoryfer Samples (a big 1980s kit; close and overhead mics blended). Clap, tambourine and cowbell from VCSL. |
 | Pop | [Virtuosity Drums](https://github.com/sfzinstruments/virtuosity_drums) by Versilian Studios, close mics (tight). Clap and tambourine from VCSL. |
-| Jazz | [Swirly Drums](https://github.com/sfzinstruments/karoryfer.swirly-drums) by Karoryfer Samples, played with brushes (dry and room blended). |
+| Jazz | [Swirly Drums](https://github.com/sfzinstruments/karoryfer.swirly-drums) by Karoryfer Samples, played with brushes (dry and room blended), its hats and cymbals set below the drums (`LEVEL` in `tools/build_kits.py`). |
 | Acoustic | Virtuosity Drums, mid, overhead and room mics (natural). |
 | Percussion | Virtuosity Drums percussion, plus cajón, darbuka, tambourine and guiro from VCSL. |
 
