@@ -23,6 +23,22 @@ The electronic kits (House, Techno, Dubstep, DnB) use no samples: `tools/synth_k
 every sound, so they're this project's own work under its MIT licence. Its reverb follows
 Jezar's public-domain Freeverb design.
 
+## Grooves (CC BY 4.0)
+
+Twelve of the grooves (`src/grooves-data.js`: Rock to Hip-hop) are excerpts of performances from
+the **Groove MIDI Dataset** by Jon Gillick, Adam Roberts, Jesse Engel, Douglas Eck and David
+Bamman (Google Magenta), released under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
+<https://magenta.tensorflow.org/datasets/groove>. They're changed: two bars and one fill bar
+taken from each performance, moved onto the bar, their drums mapped onto the kit pads and,
+where swung, written straight for the looper's Swing to play. `tools/build_grooves.py` does it.
+
+> Jon Gillick, Adam Roberts, Jesse Engel, Douglas Eck, and David Bamman. "Learning to Groove with
+> Inverse Sequence Transformations." International Conference on Machine Learning (ICML), 2019.
+
+The electronic grooves (House, Techno, Dubstep, DnB) are programmed in that script: this
+project's own work.
+
 ## Circuit Tracks firmware research
 
 The firmware update format, the input handlers' addresses, the button ids and the free RAM region

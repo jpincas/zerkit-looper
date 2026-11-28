@@ -20,6 +20,8 @@
 const LOOKAHEAD = 0.12;   // seconds of events scheduled ahead of "now"
 const EARLY_GRACE = 0.25; // beats: a first note this close before a bar line starts the take on it
 const MIN_DUR = 0.05;     // beats: shortest note we store
+const HIT = 0.1;          // beats: how long a groove's drum hits are
+const FILL = 2;           // beats: a fill plays the end of the groove's loop, this long
 
 // Record quantise, per track: where a recorded note's start snaps to (in beats). Notes keep the
 // length you played; you still hear them live exactly when you played them.
@@ -52,9 +54,10 @@ export class Engine {
     this.recStart = 0;
     this.recEnd = 0;
 
-    // Each track: { notes, loop: { origin, length, playFrom } | null }
-    // Each track: { notes, clips (audio tracks), loop, quant }
-    this.tracks = Array.from({ length: trackCount }, () => ({ notes: [], clips: [], loop: null, quant: 'off' }));
+    // Each track: { notes, clips (audio tracks), loop: { origin, length, playFrom } | null, quant,
+    // fill (a groove's fill: a bar of notes, bar-relative, or null), groove (its name) }
+    this.tracks = Array.from({ length: trackCount }, () => ({ notes: [], clips: [], loop: null, quant: 'off', fill: null, groove: null }));
+    this.fillAt = null;     // a fill playing or about to: { track: { from, to } } in beats (see fill())
     this.onClose = null;    // (track, startBeat, endBeat, pass) when a take's length is fixed
     this.onDubEnd = null;   // (track, startBeat, endBeat, pass) when an overdub pass ends (kept, not undone)
     this.dubStart = 0;      // beat the current overdub started at
@@ -120,6 +123,7 @@ export class Engine {
     for (const t of this.tracks) for (const n of t.notes) delete n.notBefore;   // beats restart from 0
     this.playing = false;
     this.anchorBeat = 0;
+    this.fillAt = null;
     this.out.cancelScheduled();
   }
 
@@ -260,7 +264,7 @@ export class Engine {
   // ---- clearing & undo ------------------------------------------------------
 
   clearAll() {
-    for (const t of this.tracks) { t.notes = []; t.clips = []; t.loop = null; }
+    for (const t of this.tracks) { t.notes = []; t.clips = []; t.loop = null; t.fill = t.groove = null; }
     this.redoStack = [];
     this.held.clear();
     this.rec = 'idle';
@@ -273,6 +277,7 @@ export class Engine {
     this.tracks[i].notes = [];
     this.tracks[i].clips = [];
     this.tracks[i].loop = null;
+    this.tracks[i].fill = this.tracks[i].groove = null;
     this.dropHeld(n => n.track === i);
     if (recordingHere) this.rec = 'idle';
     this.resync();
@@ -339,7 +344,7 @@ export class Engine {
       if (keep && (notes.length || clips.length)) saved.push({ i, notes, clips, loop: t.loop && { ...t.loop } });
       t.notes = t.notes.filter(n => n.pass !== p);
       t.clips = t.clips.filter(c => c.pass !== p);
-      if (t.notes.length === 0 && t.clips.length === 0) t.loop = null;
+      if (t.notes.length === 0 && t.clips.length === 0) t.loop = t.fill = t.groove = null;
     });
     if (saved.length) this.redoStack.push({ pass: p, tracks: saved });
     this.dropHeld(n => n.pass === p);
@@ -354,6 +359,63 @@ export class Engine {
     this.out.cancelScheduled();
     if (this.playing) this.scheduledTo = this.beat();
     this.fresh = true;
+  }
+
+  // ---- grooves ------------------------------------------------------------
+
+  // Put a groove on a track: its notes ([beat, note, velocity]) become the track's loop, `bars`
+  // long, in place of what was there (one pass, so Undo takes it off again), and its fill is
+  // kept for fill(). Playing, it comes in from the next note not yet scheduled.
+  loadGroove(i, { name, notes, fill, bars }) {
+    if (this.rec !== 'idle' && this.recTrack === i) return false;
+    const t = this.tracks[i];
+    const pass = ++this.pass;
+    this.pass++;                                            // the next recording is a pass of its own
+    this.redoStack = [];
+    this.dropHeld(n => n.track === i);
+    t.notes = notes.map(([start, note, vel]) => ({ track: i, note, vel, start, dur: HIT, pass, kind: 'groove' }));
+    t.clips = [];
+    t.fill = fill.map(([start, note, vel]) => ({ note, vel, start, dur: HIT }));
+    t.groove = name;
+    t.loop = { origin: 0, length: bars * this.beatsPerBar, playFrom: this.playing ? this.scheduledTo : 0 };
+    return true;
+  }
+
+  // Fill: arms a fill for the end of the groove's loop. Every track holding one then plays the
+  // last FILL beats of its fill bar in place of its loop's last FILL beats, landing on the loop's
+  // downbeat with its crash. Too late for this time round (its fill already under way), it's the
+  // next time round's. One at a time: armed or playing, another press does nothing.
+  fill() {
+    if (!this.playing || this.fillState()) return false;
+    const b = this.beat(), at = {};
+    this.tracks.forEach((t, i) => {
+      if (!t.fill?.length || !t.loop) return;
+      const { origin, length: L } = t.loop;
+      let to = origin + (Math.floor((b - origin) / L) + 1) * L;     // the end of this time round
+      if (to - FILL < this.scheduledTo) to += L;
+      at[i] = { from: to - FILL, to };
+    });
+    if (!Object.keys(at).length) return false;
+    this.fillAt = at;
+    return true;
+  }
+  // 'armed' (waiting for the end of the loop), 'playing', or null.
+  fillState() {
+    if (!this.fillAt) return null;
+    const b = this.beat(), w = Object.values(this.fillAt);
+    if (w.some(f => b >= f.from && b < f.to)) return 'playing';
+    return w.some(f => b < f.from) ? 'armed' : null;
+  }
+  // While a fill plays: whether one of its hits just sounded (for a light that flashes with it).
+  fillHit(within = 0.12) {
+    if (this.fillState() !== 'playing') return false;
+    const b = this.beat(), bpb = this.beatsPerBar;
+    return Object.entries(this.fillAt).some(([i, f]) => b >= f.from && b < f.to + within && this.tracks[i].fill?.some(n => {
+      const abs = f.to - bpb + n.start;
+      if (abs < f.from) return false;
+      const d = b - this.swung(abs);
+      return d >= 0 && d < within;
+    }));
   }
 
   // ---- notes --------------------------------------------------------------
@@ -433,16 +495,26 @@ export class Engine {
           if (abs >= lo) this.out.playClip?.(ti, c, this.timeAt(abs), 0);
         }
       }
+      const F = t.fill?.length ? this.fillAt?.[ti] : null;   // a fill: it plays instead, from F.from to F.to
       for (const n of t.notes) {
         if (n.dur == null) continue; // still held
         let k = Math.ceil((lo - origin - n.start) / L - 1e-9);
         for (let abs = origin + k * L + n.start; abs < to; k++, abs = origin + k * L + n.start) {
-          if (abs >= lo && !(abs < n.notBefore)) {
+          if (abs >= lo && !(abs < n.notBefore) && !(F && abs >= F.from && abs < F.to)) {
+            this.out.playNote(ti, n.note, n.vel, this.timeAt(this.swung(abs)), this.timeAt(this.swung(abs + n.dur)));
+          }
+        }
+      }
+      if (F) {
+        for (const n of t.fill) {
+          const abs = F.to - this.beatsPerBar + n.start;    // its landing (start >= a bar) falls after F.to
+          if (abs >= Math.max(lo, F.from) && abs < to) {
             this.out.playNote(ti, n.note, n.vel, this.timeAt(this.swung(abs)), this.timeAt(this.swung(abs + n.dur)));
           }
         }
       }
     });
+    if (this.fillAt && Object.values(this.fillAt).every(f => from > f.to + 1)) this.fillAt = null;
     this.scheduledTo = to;
     this.fresh = false;
   }

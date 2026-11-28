@@ -153,7 +153,7 @@ export function connectCircuit(app) {
       case BTN.settings: return actions.togglePage('settings');                                // the Mixer button (the cog)
       case BTN.clearTrack: return shift ? actions.trimTrack() : actions.clearTrack();          // the Clear button (Shift: trim)
       case BTN.undo: return shift ? actions.redo() : actions.undo();                           // the Duplicate button
-      case BTN.jam: return actions.jam();                                                      // the Patterns button
+      case BTN.jam: return actions.jamButton();                                                // the Patterns button: Jam, then a fill
     }
   }
 
@@ -207,7 +207,8 @@ export function connectCircuit(app) {
 
     const jam = app.jam?.();                                // Jam: no track selected
     TRACK_BTNS.forEach(t => (f[ledBtn(t)] = t === sel && !jam ? C.white : instCode(t)));
-    f[ledBtn(BTN.jam)] = jam ? C.amber : C.dim;
+    const fill = engine.fillState();                       // a fill: green armed, flashing with its hits as it plays
+    f[ledBtn(BTN.jam)] = fill === 'armed' || (fill === 'playing' && engine.fillHit()) ? C.green : jam ? C.amber : C.dim;
     f[ledBtn(BTN.quant)] = QUANT_CODE[engine.tracks[sel].quant];
     f[ledBtn(BTN.preset)] = app.page() === 'presets' ? C.white : instCode(sel);
     f[ledBtn(BTN.kits)] = app.page() === 'kits' ? C.white : C.dim;

@@ -34,6 +34,7 @@ export function setupSession(ctx) {
         loop: tr.loop ? { origin: tr.loop.origin, length: tr.loop.length } : null,
         notes: tr.notes.filter(n => n.dur != null).map(({ note, vel, start, dur, pass, kind }) => ({ note, vel, start, dur, pass, kind })),
       };
+      if (tr.fill) { out.fill = tr.fill.map(({ note, vel, start, dur }) => ({ note, vel, start, dur })); out.groove = tr.groove; }
       if (INSTRUMENTS[instrument].midi) {                         // so another computer can make it
         const { output, channel, input } = INSTRUMENTS[instrument];
         out.midi = { output, channel, input };
@@ -65,7 +66,7 @@ export function setupSession(ctx) {
   // A template: the project without its recordings.
   function templateOf(json) {
     const { nextPass, ...rest } = json;
-    return { ...rest, tracks: json.tracks.map(({ loop, notes, clips, ...t }) => t) };
+    return { ...rest, tracks: json.tracks.map(({ loop, notes, clips, fill, groove, ...t }) => t) };
   }
 
   const keyOf = json => JSON.stringify(json);
@@ -117,6 +118,8 @@ export function setupSession(ctx) {
       tr.notes = (t.notes ?? []).map(n => ({ ...n, track: i }));
       tr.clips = clips[i];
       tr.loop = t.loop ? { ...t.loop, playFrom: 0 } : null;
+      tr.fill = t.fill ?? null;
+      tr.groove = t.groove ?? null;
       audio.vol[i] = t.volume ?? 0.8;
       audio.mute[i] = !!t.mute;
       audio.solo[i] = !!t.solo;

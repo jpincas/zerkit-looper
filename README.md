@@ -19,6 +19,8 @@ a synth, live audio and external MIDI gear. Every track can have its own loop le
   and audio, or you can drop in your own recordings. Kits are made by dropping files onto pads.
 - **Eight FX pedals per track:** compressor, drive, filter, chorus, phaser, tremolo, delay and
   reverb, plus 32 presets.
+- **16 drum grooves to start from**, most played by real drummers: rock, pop, folk, jazz, funk
+  and electronic, each setting its tempo and swing, with a fill on the Jam button.
 - **Mixer and timing:** volume, pan, mute and solo per track, a DJ-style master filter, swing,
   per-track record quantise, a metronome and tap tempo.
 - **Projects are plain files**: a folder of JSON and WAV on your own computer. There's no account,
@@ -37,7 +39,7 @@ a synth, live audio and external MIDI gear. Every track can have its own loop le
 - [Projects and templates](#projects-and-templates)
 - [Settings](#settings)
 - [Sampled instruments](#sampled-instruments)
-- [Kits](#kits)
+- [Kits](#kits) and [grooves](#grooves)
 - [Audio tracks](#audio-tracks)
 - [MIDI tracks](#midi-tracks)
 - [FX](#fx)
@@ -114,7 +116,7 @@ serve it over https.
 | `W E` `T Y U` | Black keys |
 | `,` / `.` | Octave down / up for the selected track |
 | `1`–`8` | Select a track. The keyboard plays and records into the selected track |
-| `0` | Jam: deselect every track, so keyboards only play themselves over the loop (pick a track to come back) |
+| `0` | Jam: deselect every track, so keyboards only play themselves over the loop (pick a track to come back). While jamming: a drum fill at the end of the groove's loop |
 | `Space` | Play / stop |
 | `X` | Record: arm, then close the loop, then toggle overdub |
 | `C` | Metronome click on/off |
@@ -170,7 +172,7 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   (Shift: save a template), Open (Shift: new project) | Shift (holds for the next press).
 - **Track row:** Instrument (tap: the selected track's next melodic instrument, of those switched
   on; Shift: the Instruments page) | the eight track buttons | Jam, track "0" in dark grey (tap or
-  `0`: deselect every track). A small icon by each track's name shows its type: keyboard
+  `0`: deselect every track; again while jamming: a groove's fill). A small icon by each track's name shows its type: keyboard
   (instrument), pads (kit), saw-and-square (synth), waveform (audio). Each track button shows its
   instrument (a synth track: its preset), loop length and activity, and a small picture of its
   loop: its notes (a kit: one row per drum) or its audio, with a playhead, 4 bars at a time
@@ -194,7 +196,8 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   Play.
 
 **Jam** (track 0) deselects every track, so keyboards and pads play nothing in the looper and you
-can play your own instrument over the loop. Pick a track to come back.
+can play your own instrument over the loop. Pick a track to come back. Tapping Jam again while
+jamming arms a drum fill (see [Grooves](#grooves)); the drum on the button shows it.
 
 Each button shows its actions top to bottom: what Shift does (small grey, marked ⇧), what holding
 it does (small blue, marked with a clock), what a tap does (the main label), then any readout.
@@ -309,11 +312,11 @@ checked without a Circuit. How it works, the protocol and the button ids are in
 | Duplicate / Shift + Duplicate | Undo the last recording / redo it |
 | Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 (on the Synth page, the selected track's own button goes back to the loop) |
 | Preset / Shift + Preset | The selected track's next instrument (of those switched on) / Instruments page on and off |
-| Note / Shift + Note | The selected track's next kit (of those switched on) / Kits page on and off |
+| Note / Shift + Note | The selected track's next kit (of those switched on) / Kits page on and off (hold Shift there: pads 1-16 are the grooves) |
 | Velocity | Make the selected track a synth track and show its synth / on a synth track: Synth page on and off (knob: a column's main control; hold pad 1-3 + knob: its controls; bottom pad: on/off; Shift + pad: one of 32 presets) |
 | Gate / Shift + Gate | The selected track's next audio instrument / Audio page on and off |
 | Pattern Settings / Shift + Pattern Settings | The selected track's next MIDI instrument / MIDI page on and off |
-| Patterns | Jam (its light amber while jamming) |
+| Patterns | Jam (amber while jamming); again while jamming: a groove's fill (green while armed, flashing with its hits as it plays) |
 | Octave ▼ ▲ / Shift + Octave ▼ ▲ | Keyboard octave / move the selected track's notes an octave (instrument and MIDI tracks) |
 | Tempo/Swing: tap | Click on/off |
 | Hold Tempo/Swing + turn the master filter knob | Tempo (with Shift held too: swing) |
@@ -443,6 +446,30 @@ Your own kits are kept in the projects folder, in `Kits/`, one folder each with 
 in (`My Kit.zkit/kit.json` and `samples/`), so moving or deleting the original files doesn't
 matter. A project refers to its kits by name.
 
+### Grooves
+
+Hold **Shift** on the Kits page and the kits give way to 16 drum grooves, four of each kind, each
+kind in its own colour: pop, rock and blues (Rock, Pop, Motown, Shuffle); acoustic and folk
+(Ballad, Country, Indie folk, Bossa nova); jazz and funk (Swing, Funk, Purdie, Hip-hop); and
+electronic (House, Techno, Dubstep, DnB). Tap one, or its pad on the Circuit, and it becomes the
+selected track's loop, 2 bars long, in place of what was there. It brings its kit, sets the
+tempo and swing it was played at, and turns the click off; stopped, the looper starts so you hear it. Undo takes it off.
+
+Each groove has a fill. While jamming, tap **Jam** again (`0`, Patterns on the Circuit) at any
+time to arm it: the last two beats of the groove's loop are the fill, in place of the groove,
+landing on the loop's downbeat with a crash. Too late for this time round (its fill already
+started), it waits for the next. The drum on the Jam button is always there, grey; it's solid
+green while a fill is armed and flashes with the fill's hits as it plays. More taps while it's
+armed do nothing, and tapping Jam never takes you out of Jam (pick a track for that). It plays on
+every track holding a groove.
+
+The first twelve are real performances from Magenta's
+[Groove MIDI Dataset](https://magenta.tensorflow.org/datasets/groove) (CC BY 4.0): drummers playing
+an electronic kit to a click. `tools/build_grooves.py` takes the most typical 2 bars of each
+performance as the groove, and for the fill the bar the drummer played just before a crash. The
+timing is the drummer's own: where they swing 16ths, the notes are written straight and the
+groove sets Swing to match, so turning Swing still works. The electronic four are programmed.
+
 ## Audio tracks
 
 An **audio instrument** is a named audio input, for example "CP88" for a stage piano's USB audio.
@@ -560,7 +587,8 @@ docs/                    the Circuit protocol, MIDI notes, screenshots
   `src/fwimage.js` building LOOP06 from Novation's file;
   `src/monitor.js`: Monitor, `src/tour.js`: the guide).
 - `src/kits.js`: sample kits (storage, and each kit as an instrument); `src/kitpage.js`: the Kits
-  page and kit editor.
+  page and kit editor; `src/groovepage.js`: the grooves (Shift on the Kits page), with their
+  notes in `src/grooves-data.js`, built by `tools/build_grooves.py`.
 - `src/sampler.js`: sampled instruments (zones, playback, storage); `src/instpage.js`: the
   Instruments page and the instrument maker.
 - `src/circuit.js`: the Circuit Tracks control surface; `src/midiin.js`: MIDI inputs.
@@ -585,6 +613,12 @@ python3 tools/synth_kits.py     # the electronic kits: synthesised, no downloads
 
 ```bash
 python3 tools/build_instruments.py
+```
+
+The grooves need the Groove MIDI Dataset and `mido` (the script's docstring has the commands):
+
+```bash
+python3 tools/build_grooves.py groove/
 ```
 
 **Releasing.** Work happens on `main`; pushing to it doesn't change the live site. A release is
@@ -612,7 +646,8 @@ The code is under the [MIT licence](LICENSE).
 The built-in kits and instruments come from sample libraries by **Karoryfer Samples** and
 **Versilian Studios** (Big Rusty Drums, Swirly Drums, Virtuosity Drums, VCSL, Osiris Piano,
 Meatbass, and Cello with Bigcat), all released under CC0 1.0. The electronic kits are synthesised
-by this project's own code. The Circuit Tracks firmware work
+by this project's own code. Twelve of the grooves are performances from the
+[Groove MIDI Dataset](https://magenta.tensorflow.org/datasets/groove) by Google Magenta, under CC BY 4.0. The Circuit Tracks firmware work
 builds on research by the [CIRCUIT-HACKS-RC](https://github.com/Ghillermo/CIRCUIT-HACKS-RC)
 project. Details are in [NOTICE.md](NOTICE.md).
 

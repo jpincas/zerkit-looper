@@ -146,6 +146,17 @@ body:not(.ready) .app { visibility: hidden; }     /* until main.js has built the
 .tbtn.jam .tname { color: var(--muted); }
 .tbtn.jam.on { --c: #c9ced8; background: #2a2e36; border-color: #c9ced8; box-shadow: 0 0 0 1px #c9ced8; }
 .tbtn.jam.on .tnum, .tbtn.jam.on .tname { color: var(--text); }
+/* The fill drum, top right: grey, green while a fill is armed, flashing with its hits as it plays */
+.tbtn.jam .fillicon {
+  position: absolute; top: 9px; right: 9px; width: 18px; height: 16px; color: #4a515e;
+  background: currentColor;
+  -webkit-mask: var(--icon-drum) center / contain no-repeat;
+  mask: var(--icon-drum) center / contain no-repeat;
+  --icon-drum: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 18'%3E%3Cpath d='M1 1.5l8 6M19 1.5l-8 6' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Cellipse cx='10' cy='9.5' rx='8' ry='2.6'/%3E%3Cpath d='M2 10.5v4.2c0 1.5 3.6 2.7 8 2.7s8-1.2 8-2.7v-4.2c-1.2 1.4-4.4 2.3-8 2.3s-6.8-.9-8-2.3z'/%3E%3C/svg%3E");
+}
+.tbtn.jam.on .fillicon { color: #8a92a1; }
+.tbtn.jam.fill-armed .fillicon, .tbtn.jam.fill-hit .fillicon { color: #3ddc84; filter: drop-shadow(0 0 4px #3ddc84aa); }
+.tbtn.jam.filling:not(.fill-hit) .fillicon { color: #1f5f3c; }
 .tbtn.jam .ticon {
   width: 10px; height: 10px;
   --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cellipse cx='4' cy='14.2' rx='3.1' ry='2.4' transform='rotate(-20 4 14.2)'/%3E%3Cellipse cx='14' cy='12.2' rx='3.1' ry='2.4' transform='rotate(-20 14 12.2)'/%3E%3Cpath d='M6.3 13.6V3.6L16.3 1.6V11.6' fill='none' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M6.3 3.6L16.3 1.6V4.6L6.3 6.6Z'/%3E%3C/svg%3E");

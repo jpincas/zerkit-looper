@@ -8,7 +8,8 @@ import { AudioInputs } from './audioin.js';
 import { connectMidiKeyboards } from './midiin.js';
 import { setupSession } from './session.js';
 import { setupKitPage } from './kitpage.js';
-import { registerBuiltInKits } from './kits.js';
+import { setupGroovePage } from './groovepage.js';
+import { registerBuiltInKits, kitKey } from './kits.js';
 import { registerBuiltInInstruments } from './sampler.js';
 import { setupInstrumentPage } from './instpage.js';
 import { setupAudioInstruments } from './audioinst.js';
@@ -110,6 +111,29 @@ const actions = {
     if (page === 'synth' && t === engine.selected && !jam) page = 'looper';   // its own track button: back to the loops
     jam = false;
     engine.select(t);
+  },
+  // A groove (Shift on the Kits page) on the selected track: its kit, notes and fill, and the
+  // tempo and swing it was played at (the tempo stays put if there's recorded audio), and the click
+  // goes off. Stopped,
+  // it starts playing, so you hear it. Jamming (no track selected), it ends the jam and goes on
+  // the track that was selected.
+  groove(g) {
+    jam = false;
+    const t = engine.selected;
+    if (isAudio(t)) return session.toast('Grooves go on a kit track: pick another track', 'warn');
+    if (engine.rec !== 'idle' && engine.recTrack === t) return;
+    if (INSTRUMENTS[kitKey(g.kit)]) actions.instrument(t, kitKey(g.kit));
+    engine.setTempo(g.bpm);
+    engine.setSwing(g.swing);
+    engine.click = false;                                 // the drums keep time now
+    engine.loadGroove(t, g);
+    if (!engine.playing) actions.play();
+  },
+  // The Jam button: the first tap goes into Jam; tapped while jamming, it arms the grooves' fill
+  // for the end of their loop (once armed, more taps do nothing). Picking a track leaves Jam.
+  jamButton() {
+    if (!jam) return actions.jam();
+    engine.fill();
   },
   // Jam: no track selected, so keyboards and pads play nothing in the looper and you can play
   // over the loop (on an instrument that makes its own sound). Picking a track ends it.
@@ -336,9 +360,9 @@ for (const [row, col, key, def] of [
   btn[key] = b;
 }
 // Jam sits to the right of the track buttons, as track "0".
-btn.jam = el('button', 'tbtn jam', '<span class="tnum">0</span><span class="tinst"><i class="ticon"></i><span class="tname">Jam</span></span>');
-btn.jam.title = 'Jam: deselect every track, so your keyboard plays only itself over the loop. Pick a track to come back (0)';
-btn.jam.addEventListener('click', () => { audio.resume(); actions.jam(); });
+btn.jam = el('button', 'tbtn jam', '<span class="tnum">0</span><i class="fillicon"></i><span class="tinst"><i class="ticon"></i><span class="tname">Jam</span></span>');
+btn.jam.title = 'Jam: deselect every track, so your keyboard plays only itself over the loop; pick a track to come back (0). Tap it again while jamming: a drum fill at the end of the groove\'s loop (the drum lights green while it\'s armed and flashes as it plays)';
+btn.jam.addEventListener('click', () => { audio.resume(); actions.jamButton(); });
 Object.assign(btn.jam.style, { gridRow: 4, gridColumn: 10 });
 $('device').appendChild(btn.jam);
 
@@ -497,7 +521,7 @@ window.addEventListener('keydown', e => {
   if (e.repeat && !isArrow) return;
   const digit = /^Digit([1-9])$/.exec(e.code);
   if (digit) { actions.select(Number(digit[1]) - 1); e.preventDefault(); return; }
-  if (e.code === 'Digit0') { actions.jam(); e.preventDefault(); return; }
+  if (e.code === 'Digit0') { actions.jamButton(); e.preventDefault(); return; }
   switch (e.code) {
     case 'Space': actions.play(); break;
     case 'KeyX': actions.record(); break;
@@ -673,11 +697,11 @@ const fxPage = setupFxPage({ root: $('page-fx'), audio, engine, trackName: nameO
 // The guide: a click-through of the panel. Each step opens its page (or the playing panel, or
 // Jam); closing it puts back what was on screen. Its Synth step shows the synth of the selected
 // track, or of a synth track, even when it isn't one (`guideSynth`): nothing is changed.
-let guideSynth = false;
+let guideSynth = false, guideGrooves = false;
 const tour = setupTour({
   snapshot: () => ({ page, notePanel, jam, sel: engine.selected, sp: settings.page() }),
   restore(s) {
-    guideSynth = false;
+    guideSynth = guideGrooves = false;
     page = s.page; notePanel = s.notePanel; jam = s.jam;
     engine.select(s.sel);
     settings.selectPage(s.sp);
@@ -688,6 +712,7 @@ const tour = setupTour({
     notePanel = !!v.keys;
     jam = !!v.jam;
     guideSynth = page === 'synth';
+    guideGrooves = !!v.grooves;
     if (guideSynth && !isSynth(engine.selected)) {
       const t = engine.tracks.findIndex((_, i) => isSynth(i));
       if (t >= 0) engine.select(t);
@@ -710,7 +735,7 @@ const synthPage = setupSynthPage({ root: $('page-synth'), audio, engine, isSynth
 function pageCards() {
   switch (page) {
     case 'presets': return instPage.editing() ? null : instPage.cards;
-    case 'kits': return kitPage.editing() ? null : kitPage.cards;
+    case 'kits': return kitPage.editing() ? null : shiftDown() ? groovePage.cards : kitPage.cards;   // Shift: the grooves
     case 'audio': return audioPage.editing() ? null : audioPage.cards;
     case 'midi': return midiPage.editing() ? null : midiPage.cards;
     case 'fx': return fxPage.cards;
@@ -746,9 +771,13 @@ function drawPage() {
   if (page === 'audio') { if (!audioShown) audioPage.show(); audioPage.update(); }
   for (const id of ['mute-row', 'solo-row', 'seq']) $(id).hidden = page !== 'looper';
   $('page-presets').hidden = page !== 'presets';
-  const kitsShown = !$('page-kits').hidden;
-  $('page-kits').hidden = page !== 'kits';
-  if (page === 'kits') { if (!kitsShown) kitPage.show(); kitPage.update(); }
+  // Kits, or with Shift held, the grooves in their place.
+  const grooving = page === 'kits' && (shiftDown() || guideGrooves) && !kitPage.editing();
+  const kitsShown = !$('page-kits').hidden, groovesShown = !$('page-grooves').hidden;
+  $('page-kits').hidden = page !== 'kits' || grooving;
+  $('page-grooves').hidden = !grooving;
+  if (page === 'kits' && !grooving) { if (!kitsShown) kitPage.show(); kitPage.update(); }
+  if (grooving) { if (!groovesShown) groovePage.show(); groovePage.update(); }
   const instShown = $('page-presets').dataset.shown === '1';
   $('page-presets').dataset.shown = page === 'presets' ? '1' : '';
   if (page === 'presets') { if (!instShown) instPage.show(); instPage.update(); }
@@ -884,6 +913,10 @@ function frame() {
   $('seq').style.setProperty('--lane-color', color);
   setText($('seq-title'), jam ? 'Jam' : `Track ${sel + 1}`);
   btn.jam.classList.toggle('on', jam);
+  const fill = engine.fillState();
+  btn.jam.classList.toggle('fill-armed', fill === 'armed');
+  btn.jam.classList.toggle('filling', fill === 'playing');
+  btn.jam.classList.toggle('fill-hit', fill === 'playing' && engine.fillHit());
   document.body.classList.toggle('jam', jam);
   if (instSelect.value !== audio.instruments[sel] && document.activeElement !== instSelect) instSelect.value = audio.instruments[sel];
   const bars = view.length / bpb;
@@ -958,6 +991,8 @@ const midiPage = setupMidiInstruments({
 fillInstruments();                       // now with this computer's audio and MIDI instruments
 const instPage = setupInstrumentPage({ root: $('page-presets'), audio, engine, presetOn, session, inputs, onChanged: () => fillInstruments() });
 const kitPage = setupKitPage({ root: $('page-kits'), audio, engine, kitOn, session, onKitsChanged: fillInstruments, builtInKits });
+const groovePage = setupGroovePage({ root: $('page-grooves'), current: () => engine.tracks[engine.selected].groove,
+  onPick: g => { audio.resume(); shiftLatch = false; actions.groove(g); } });
 session.store.onGranted = () => { kitPage.refresh(); instPage.refresh(); };   // folder allowed: your kits and instruments
 instPage.refresh();
 // The project's name in the logo row (• = unsaved changes); Save lights up when there are some.

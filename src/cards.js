@@ -6,10 +6,10 @@
 //   items():   [{ key, name, color }] in order (the first 16 are shown)
 //   isOn(key), current(key): the switch, and whether the selected track is playing it
 //   toggle(key), onEdit(key)?, onNew()?, newLabel?, footer()?: html under the cards (wireFoot(el)
-//   hooks up any buttons in it), usedBy(key): the small text on a card
+//   hooks up any buttons in it), usedBy(key): the small text on a card, hint(item)?: its tooltip
 export const MAX_CARDS = 16;
 
-export function cardPage(root, { items, isOn, current, toggle, onEdit, onNew, newLabel, footer, wireFoot, usedBy }) {
+export function cardPage(root, { items, isOn, current, toggle, onEdit, onNew, newLabel, footer, wireFoot, usedBy, hint }) {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   let drawnKeys = '', drawnFoot = '';
 
@@ -27,7 +27,7 @@ export function cardPage(root, { items, isOn, current, toggle, onEdit, onNew, ne
       card.style.gridRow = i < 8 ? 1 : 2;
       card.style.gridColumn = (i % 8) + 1;
       card.style.setProperty('--c', item.color);
-      card.title = `${item.name}: tap to switch it in or out of the cycle${onEdit ? ' · ✎ to edit' : ''}`;
+      card.title = hint?.(item) ?? `${item.name}: tap to switch it in or out of the cycle${onEdit ? ' · ✎ to edit' : ''}`;
       card.innerHTML = `<span class="card-num">${i + 1}</span><i class="card-dot"></i>`
         + `<span class="card-name">${esc(item.name)}</span><span class="card-use"></span>`
         + (onEdit ? '<button class="card-edit" title="Edit">✎</button>' : '');
