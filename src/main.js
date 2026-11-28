@@ -106,9 +106,11 @@ const actions = {
     const t = engine.selected;
     octaves[t] = Math.max(0, Math.min(7, octaves[t] + d));
   },
+  // A track button: that track, back on the Looper (the sequencer) from whatever page is open.
+  // Settings is the exception: there the track buttons pick its page.
   select(t) {
-    if (page === 'settings') return settings.selectPage(t);   // Settings: the track buttons pick its page
-    if (page === 'synth' && t === engine.selected && !jam) page = 'looper';   // its own track button: back to the loops
+    if (page === 'settings') return settings.selectPage(t);
+    page = 'looper';
     jam = false;
     engine.select(t);
   },

@@ -177,7 +177,8 @@ The page is laid out like the Circuit Tracks. Top to bottom:
   instrument (a synth track: its preset), loop length and activity, and a small picture of its
   loop: its notes (a kit: one row per drum) or its audio, with a playhead, 4 bars at a time
   (longer loops page as they play). Click one, press `1`–`8`, or press its Circuit button to
-  select it. On the Synth page, the selected track's own button goes back to the loop.
+  select it. From any page (Kits, FX, Synth and the rest) a track button also goes back to the
+  Looper; only Settings uses them for its own pages.
 - **Pages:** the pad area shows the Looper, or another page. Shift + Instrument opens
   **Instruments**: every melodic instrument with a switch for whether Instrument cycles through it
   (and which tracks use it). Shift + Audio opens **Audio**, Shift + MIDI opens **MIDI**.
@@ -310,7 +311,7 @@ checked without a Circuit. How it works, the protocol and the button ids are in
 | Play / Record | Play-stop / record (arm, close, overdub) |
 | Clear / Shift + Clear | Clear the selected track / trim the blank bars off the end of its loop |
 | Duplicate / Shift + Duplicate | Undo the last recording / redo it |
-| Track buttons (Synth 1 … Drum 4) | Select tracks 1–8 (on the Synth page, the selected track's own button goes back to the loop) |
+| Track buttons (Synth 1 … Drum 4) | Select tracks 1–8, and go back to the Looper from any page (in Settings: its pages) |
 | Preset / Shift + Preset | The selected track's next instrument (of those switched on) / Instruments page on and off |
 | Note / Shift + Note | The selected track's next kit (of those switched on) / Kits page on and off (hold Shift there: all 32 pads are the grooves) |
 | Velocity | Make the selected track a synth track and show its synth / on a synth track: Synth page on and off (knob: a column's main control; hold pad 1-3 + knob: its controls; bottom pad: on/off; Shift + pad: one of 32 presets) |
@@ -539,7 +540,7 @@ saved with the project.
 ## Synth tracks
 
 **Synth** (the Circuit's Velocity button) makes the selected track a synth track and opens its
-synth; on a synth track it opens and closes the Synth page (that track's own button closes it too).
+synth; on a synth track it opens and closes the Synth page (any track button closes it too).
 Every track has its own synth
 settings, so eight synth tracks can sound completely different; they're saved with the project
 (kept even while a track plays something else). It's made of Web Audio nodes, like the FX, laid
